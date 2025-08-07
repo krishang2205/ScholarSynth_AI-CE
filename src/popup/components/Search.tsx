@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -14,7 +14,8 @@ import {
   CircularProgress,
   Accordion,
   AccordionSummary,
-  AccordionDetails
+  AccordionDetails,
+  Skeleton
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -30,23 +31,53 @@ const Search: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedNote, setExpandedNote] = useState<string | null>(null);
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  const handleSearch = async () => {
-    if (!query.trim()) return;
+  // Debounced search function
+  const debouncedSearch = useCallback((searchQuery: string) => {
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
 
-    console.log('Starting search with query:', query.trim());
+    const timeout = setTimeout(() => {
+      if (searchQuery.trim()) {
+        handleSearch(searchQuery);
+      }
+    }, 500); // 500ms delay
+
+    setSearchTimeout(timeout);
+  }, []);
+
+  // Handle query changes with debouncing
+  const handleQueryChange = (newQuery: string) => {
+    setQuery(newQuery);
+    setError(null);
+    
+    if (newQuery.trim()) {
+      debouncedSearch(newQuery);
+    } else {
+      setResults([]);
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = async (searchQuery?: string) => {
+    const queryToSearch = searchQuery || query.trim();
+    if (!queryToSearch) return;
+
+    console.log('Starting optimized search with query:', queryToSearch);
     setLoading(true);
     setError(null);
     
     // Add timeout to prevent hanging
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Search timeout - please try again')), 10000); // 10 second timeout
+      setTimeout(() => reject(new Error('Search timeout - please try again')), 15000); // 15 second timeout
     });
     
     try {
       const searchPromise = chrome.runtime.sendMessage({
         type: 'SEARCH_NOTES',
-        data: { query: query.trim(), limit: 10 }
+        data: { query: queryToSearch, limit: 10 }
       });
 
       const response = await Promise.race([searchPromise, timeoutPromise]);
@@ -75,6 +106,9 @@ const Search: React.FC = () => {
 
   const handleKeyPress = (event: React.KeyboardEvent) => {
     if (event.key === 'Enter') {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
       handleSearch();
     }
   };
@@ -95,6 +129,31 @@ const Search: React.FC = () => {
     return 'default';
   };
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+    };
+  }, [searchTimeout]);
+
+  // Loading skeleton component
+  const LoadingSkeleton = () => (
+    <Box>
+      {[1, 2, 3].map((index) => (
+        <Card key={index} sx={{ mb: 2 }}>
+          <CardContent>
+            <Skeleton variant="text" width="60%" height={24} sx={{ mb: 1 }} />
+            <Skeleton variant="text" width="40%" height={20} sx={{ mb: 1 }} />
+            <Skeleton variant="text" width="80%" height={16} />
+            <Skeleton variant="text" width="60%" height={16} />
+          </CardContent>
+        </Card>
+      ))}
+    </Box>
+  );
+
   return (
     <Box sx={{ pb: 7 }}>
       <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
@@ -108,33 +167,39 @@ const Search: React.FC = () => {
             <TextField
               fullWidth
               variant="outlined"
-              placeholder="Search your notes semantically..."
+              placeholder="Search your notes semantically... (auto-search after typing)"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => handleQueryChange(e.target.value)}
               onKeyPress={handleKeyPress}
               InputProps={{
                 startAdornment: (
                   <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
                 ),
+                endAdornment: loading && (
+                  <CircularProgress size={20} sx={{ mr: 1 }} />
+                ),
               }}
             />
             <Button
               variant="contained"
-              onClick={handleSearch}
+              onClick={() => handleSearch()}
               disabled={loading || !query.trim()}
               sx={{ minWidth: 100 }}
             >
-              {loading ? <CircularProgress size={20} /> : 'Search'}
+              Search
             </Button>
           </Box>
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-            Search through your notes using natural language. The AI will find the most relevant content.
+            Search through your notes using natural language. Results appear automatically as you type.
           </Typography>
         </CardContent>
       </Card>
 
+      {/* Loading State */}
+      {loading && <LoadingSkeleton />}
+
       {/* Results */}
-      {results.length > 0 && (
+      {!loading && results.length > 0 && (
         <Box>
           <Typography variant="h6" sx={{ mb: 2 }}>
             Results ({results.length})
@@ -254,8 +319,7 @@ const Search: React.FC = () => {
             Search Your Notes
           </Typography>
           <Typography className="empty-state-description">
-            Use natural language to find relevant content in your saved notes. 
-            The AI will understand the context and find the most relevant matches.
+            Start typing to search through your notes. The AI will understand the context and find the most relevant matches.
           </Typography>
         </Box>
       )}
