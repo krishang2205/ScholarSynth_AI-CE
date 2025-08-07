@@ -9,8 +9,16 @@ class SearchService {
       
       // Generate embedding for the query
       console.log('SearchService: Generating query embedding...');
-      const queryEmbedding = await aiService.generateEmbedding(query);
-      console.log('SearchService: Query embedding generated, length:', queryEmbedding.length);
+      let queryEmbedding: number[];
+      try {
+        queryEmbedding = await aiService.generateEmbedding(query);
+        console.log('SearchService: Query embedding generated, length:', queryEmbedding.length);
+      } catch (embeddingError) {
+        console.error('SearchService: Failed to generate query embedding:', embeddingError);
+        // Fallback to text-based search immediately
+        console.log('SearchService: Falling back to text-based search due to embedding error');
+        return this.textBasedSearch(query, limit);
+      }
       
       // Get all notes with their embeddings
       console.log('SearchService: Getting notes and embeddings...');
@@ -18,6 +26,12 @@ class SearchService {
       const embeddings = await storageService.getAllEmbeddings();
       
       console.log('SearchService: Found', notes.length, 'notes and', embeddings.length, 'embeddings');
+      
+      // If no embeddings exist, fallback to text search
+      if (embeddings.length === 0) {
+        console.log('SearchService: No embeddings found, using text-based search');
+        return this.textBasedSearch(query, limit);
+      }
       
       // Create a map of note ID to embedding
       const embeddingMap = new Map<string, number[]>();
@@ -27,15 +41,43 @@ class SearchService {
 
       // Calculate similarities
       const results: SearchResult[] = [];
+      let vectorMismatchDetected = false;
       
       for (const note of notes) {
         const noteEmbedding = embeddingMap.get(note.id);
         if (noteEmbedding) {
-          const similarity = this.cosineSimilarity(queryEmbedding, noteEmbedding);
-          results.push({
-            note,
-            similarity
-          });
+          try {
+            // Check if embeddings have the same length
+            if (queryEmbedding.length !== noteEmbedding.length) {
+              console.warn(`Vector length mismatch for note ${note.id}: query=${queryEmbedding.length}, note=${noteEmbedding.length}`);
+              vectorMismatchDetected = true;
+              // Skip this note and continue with others
+              continue;
+            }
+            
+            const similarity = this.cosineSimilarity(queryEmbedding, noteEmbedding);
+            results.push({
+              note,
+              similarity
+            });
+          } catch (similarityError) {
+            console.error('SearchService: Error calculating similarity for note', note.id, similarityError);
+            // Skip this note and continue with others
+          }
+        }
+      }
+
+      // If vector mismatches were detected, regenerate embeddings and retry
+      if (vectorMismatchDetected && results.length === 0) {
+        console.log('SearchService: Vector mismatches detected, regenerating embeddings...');
+        try {
+          await this.regenerateEmbeddings();
+          // Retry the search with regenerated embeddings
+          return this.searchNotes(query, limit);
+        } catch (regenerationError) {
+          console.error('SearchService: Failed to regenerate embeddings:', regenerationError);
+          // Fallback to text-based search
+          return this.textBasedSearch(query, limit);
         }
       }
 
@@ -213,6 +255,28 @@ class SearchService {
     const notes = await storageService.getAllNotes();
     
     return notes.filter(note => note.rating && note.rating >= minRating);
+  }
+
+  async regenerateEmbeddings(): Promise<void> {
+    console.log('SearchService: Regenerating embeddings for all notes...');
+    try {
+      const notes = await storageService.getAllNotes();
+      let regeneratedCount = 0;
+      
+      for (const note of notes) {
+        try {
+          const newEmbedding = await aiService.generateEmbedding(note.content);
+          await storageService.saveEmbedding(note.id, newEmbedding);
+          regeneratedCount++;
+        } catch (error) {
+          console.error(`Failed to regenerate embedding for note ${note.id}:`, error);
+        }
+      }
+      
+      console.log(`SearchService: Regenerated ${regeneratedCount} embeddings`);
+    } catch (error) {
+      console.error('SearchService: Error regenerating embeddings:', error);
+    }
   }
 }
 

@@ -28,6 +28,7 @@ const Search: React.FC = () => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [expandedNote, setExpandedNote] = useState<string | null>(null);
 
   const handleSearch = async () => {
@@ -35,15 +36,28 @@ const Search: React.FC = () => {
 
     console.log('Starting search with query:', query.trim());
     setLoading(true);
+    setError(null);
+    
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Search timeout - please try again')), 10000); // 10 second timeout
+    });
+    
     try {
-      const response = await chrome.runtime.sendMessage({
+      const searchPromise = chrome.runtime.sendMessage({
         type: 'SEARCH_NOTES',
         data: { query: query.trim(), limit: 10 }
       });
 
+      const response = await Promise.race([searchPromise, timeoutPromise]);
+
       console.log('Search response:', response);
 
-      if (response.results) {
+      if (response.error) {
+        console.error('Search error:', response.error);
+        setError(response.error);
+        setResults([]);
+      } else if (response.results) {
         console.log('Found', response.results.length, 'search results');
         setResults(response.results);
       } else {
@@ -52,6 +66,7 @@ const Search: React.FC = () => {
       }
     } catch (error) {
       console.error('Error searching notes:', error);
+      setError(error instanceof Error ? error.message : 'Failed to search notes. Please try again.');
       setResults([]);
     } finally {
       setLoading(false);
@@ -205,8 +220,21 @@ const Search: React.FC = () => {
         </Box>
       )}
 
+      {/* Error State */}
+      {error && (
+        <Box className="empty-state">
+          <div className="empty-state-icon">⚠️</div>
+          <Typography className="empty-state-title" color="error">
+            Search Error
+          </Typography>
+          <Typography className="empty-state-description" color="error">
+            {error}
+          </Typography>
+        </Box>
+      )}
+
       {/* Empty State */}
-      {!loading && results.length === 0 && query && (
+      {!loading && results.length === 0 && query && !error && (
         <Box className="empty-state">
           <div className="empty-state-icon">🔍</div>
           <Typography className="empty-state-title">
@@ -219,7 +247,7 @@ const Search: React.FC = () => {
       )}
 
       {/* Initial State */}
-      {!loading && results.length === 0 && !query && (
+      {!loading && results.length === 0 && !query && !error && (
         <Box className="empty-state">
           <div className="empty-state-icon">🔍</div>
           <Typography className="empty-state-title">

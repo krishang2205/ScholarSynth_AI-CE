@@ -257,7 +257,13 @@ Summary (use different vocabulary and sentence structure):`;
       const response: EmbeddingResponse = await this.makeGeminiRequest(this.EMBEDDING_API_URL, data);
       
       if (response.embedding?.values) {
-        return response.embedding.values;
+        // Ensure the embedding has exactly 128 dimensions
+        const embedding = response.embedding.values;
+        if (embedding.length !== 128) {
+          console.warn(`API embedding length (${embedding.length}) doesn't match expected (128), using local fallback`);
+          return this.localEmbedding(text);
+        }
+        return embedding;
       } else {
         throw new Error('Invalid embedding response');
       }

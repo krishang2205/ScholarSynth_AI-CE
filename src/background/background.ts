@@ -1,5 +1,6 @@
 import { storageService } from '../services/storage';
 import { aiService } from '../services/ai';
+import { searchService } from '../services/search';
 import { Note, UserProfile } from '../types';
 
 // Initialize services
@@ -317,13 +318,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'SEARCH_NOTES':
           try {
             console.log('Background: Starting search for query:', message.data.query);
-            const { searchService } = await import('../services/search');
-            console.log('Background: SearchService imported successfully');
             const results = await searchService.searchNotes(message.data.query, message.data.limit);
             console.log('Background: Search completed, found', results.length, 'results');
             sendResponse({ results });
           } catch (error: any) {
             console.error('Background: Search error:', error);
+            sendResponse({ error: error.message });
+          }
+          break;
+
+        case 'REGENERATE_EMBEDDINGS':
+          try {
+            console.log('Background: Starting embedding regeneration...');
+            await searchService.regenerateEmbeddings();
+            console.log('Background: Embedding regeneration completed');
+            sendResponse({ success: true });
+          } catch (error: any) {
+            console.error('Background: Embedding regeneration error:', error);
             sendResponse({ error: error.message });
           }
           break;
