@@ -10,6 +10,7 @@ import Visualizations from './components/Visualizations';
 import User from './components/User';
 import Auth from './components/Auth';
 import { authService } from '../services/auth';
+import { safeSendMessage } from '../utils/message-utils';
 
 type ViewType = 'dashboard' | 'notes' | 'search' | 'chat' | 'settings' | 'visualizations' | 'user';
 
@@ -18,6 +19,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
     // Check authentication status and initialize app
@@ -31,6 +33,16 @@ function App() {
           setIsAuthenticated(false);
           setCurrentUser(null);
         }
+        // load settings for dark mode
+        try {
+          const resp = await safeSendMessage({ type: 'GET_SETTINGS' });
+          const dm = resp?.settings?.darkMode;
+          if (typeof dm === 'boolean') {
+            setDarkMode(dm);
+            const root = document.getElementById('root');
+            if (root) { if (dm) root.classList.add('dark'); else root.classList.remove('dark'); }
+          }
+        } catch (e) { /* ignore */ }
       } catch (error) {
         console.error('Error checking auth status:', error);
         setIsAuthenticated(false);

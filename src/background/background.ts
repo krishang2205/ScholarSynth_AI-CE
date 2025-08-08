@@ -315,6 +315,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ settings });
           break;
 
+        case 'SETTINGS_UPDATE':
+          try {
+            await storageService.saveSettings(message.data || {});
+            sendResponse({ success: true });
+          } catch (error:any) {
+            sendResponse({ success:false, error: error.message });
+          }
+          break;
+
+        case 'SAVE_SETTINGS': // generic save (legacy path)
+          try {
+            await storageService.saveSettings(message.data?.settings || {});
+            sendResponse({ success: true });
+          } catch (error:any) {
+            sendResponse({ success:false, error: error.message });
+          }
+          break;
+
         case 'SEARCH_NOTES':
           try {
             console.log('Background: Starting search for query:', message.data.query);

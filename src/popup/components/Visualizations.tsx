@@ -1,33 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  Card,
-  CardContent,
-  Typography,
-  Box,
-  Tabs,
-  Tab,
-  CircularProgress,
-  Chip
-} from '@mui/material';
-import {
-  AccountTree as MindMapIcon,
-  Timeline as TimelineIcon,
-  BubbleChart as ProjectMapIcon
-} from '@mui/icons-material';
-import { Note, Project, VisualizationData } from '../../types';
+import { Card, CardContent, Typography, Box, Tabs, Tab } from '@mui/material';
+import { AccountTree as MindMapIcon, Timeline as TimelineIcon } from '@mui/icons-material';
+import { Note } from '../../types';
 import * as d3 from 'd3';
 
-// D3 simulation node interface
-interface D3Node extends d3.SimulationNodeDatum {
-  id: string;
-  name: string;
-  description: string;
-  color: string;
-  createdAt: Date;
-  updatedAt: Date;
-  noteCount: number;
-  size: number;
-}
+// Project map removed: D3Node interface no longer needed
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -53,7 +30,7 @@ function TabPanel(props: TabPanelProps) {
 const Visualizations: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [notes, setNotes] = useState<Note[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  // Removed Project Map feature (projects state removed)
   // Mind map settings (phased implementation)
   const [maxTopics, setMaxTopics] = useState(8); // used in later phases
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null); // phase 2 detail panel
@@ -66,7 +43,7 @@ const Visualizations: React.FC = () => {
   // Track which topics are expanded in mind map
   const expandedTopicsRef = useRef<Set<string>>(new Set());
   const timelineRef = useRef<HTMLDivElement>(null);
-  const projectMapRef = useRef<HTMLDivElement>(null);
+  // projectMapRef removed with Project Map feature
 
   useEffect(() => {
     loadData();
@@ -77,7 +54,7 @@ const Visualizations: React.FC = () => {
       // Only re-render mind map on mind-map specific state changes to avoid unnecessary work
       renderVisualization();
     }
-  }, [notes, projects, tabValue, loading, selectedTopic, showConnections, maxTopics]);
+  }, [notes, tabValue, loading, selectedTopic, showConnections, maxTopics]);
 
   useEffect(()=>{
     if(showArcModal) renderArcModal();
@@ -86,13 +63,8 @@ const Visualizations: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [notesResponse, projectsResponse] = await Promise.all([
-        chrome.runtime.sendMessage({ type: 'GET_NOTES' }),
-        chrome.runtime.sendMessage({ type: 'GET_PROJECTS' })
-      ]);
-
-      setNotes(notesResponse.notes || []);
-      setProjects(projectsResponse.projects || []);
+  const notesResponse = await chrome.runtime.sendMessage({ type: 'GET_NOTES' });
+  setNotes(notesResponse.notes || []);
     } catch (error) {
       console.error('Error loading visualization data:', error);
     } finally {
@@ -107,9 +79,6 @@ const Visualizations: React.FC = () => {
         break;
       case 1:
         renderTimeline();
-        break;
-      case 2:
-        renderProjectMap();
         break;
     }
   };
@@ -707,78 +676,7 @@ const Visualizations: React.FC = () => {
       .attr('d', line);
   };
 
-  const renderProjectMap = () => {
-    if (!projectMapRef.current) return;
-
-    // Clear previous content
-    d3.select(projectMapRef.current).selectAll("*").remove();
-
-    if (projects.length === 0) {
-      projectMapRef.current.innerHTML = '<div class="empty-state">No projects found</div>';
-      return;
-    }
-
-    const width = projectMapRef.current.clientWidth;
-    const height = 400;
-
-    const svg = d3.select(projectMapRef.current)
-      .append('svg')
-      .attr('width', width)
-      .attr('height', height);
-
-    // Group notes by project
-    const projectData: D3Node[] = projects.map(project => {
-      const projectNotes = notes.filter(note => note.project === project.id);
-      return {
-        ...project,
-        noteCount: projectNotes.length,
-        size: Math.max(20, projectNotes.length * 10)
-      };
-    }).filter(project => project.noteCount > 0);
-
-    if (projectData.length === 0) {
-      projectMapRef.current.innerHTML = '<div class="empty-state">No projects with notes found</div>';
-      return;
-    }
-
-    // Create force simulation
-    const simulation = d3.forceSimulation<D3Node>(projectData)
-      .force('charge', d3.forceManyBody().strength(-100))
-      .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide<D3Node>().radius(d => d.size + 5));
-
-    // Add project nodes
-    const nodes = svg.selectAll('.project-node')
-      .data(projectData)
-      .enter()
-      .append('g')
-      .attr('class', 'project-node');
-
-    nodes.append('circle')
-      .attr('r', d => d.size)
-      .attr('fill', (d, i) => d3.schemeCategory10[i % 10])
-      .attr('opacity', 0.7);
-
-    nodes.append('text')
-      .text(d => d.name)
-      .attr('text-anchor', 'middle')
-      .attr('dy', '0.35em')
-      .attr('font-size', '12px')
-      .attr('fill', 'white')
-      .attr('font-weight', 'bold');
-
-    nodes.append('text')
-      .text(d => `${d.noteCount} notes`)
-      .attr('text-anchor', 'middle')
-      .attr('dy', '1.5em')
-      .attr('font-size', '10px')
-      .attr('fill', 'white');
-
-    // Update positions on simulation tick
-    simulation.on('tick', () => {
-      nodes.attr('transform', d => `translate(${d.x || 0}, ${d.y || 0})`);
-    });
-  };
+  // Project Map feature removed
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -821,21 +719,8 @@ const Visualizations: React.FC = () => {
               '& .MuiTabs-indicator': { height: 2 }
             }}
           >
-            <Tab 
-              icon={<MindMapIcon />} 
-              label="Mind Map" 
-              iconPosition="start"
-            />
-            <Tab 
-              icon={<TimelineIcon />} 
-              label="Timeline" 
-              iconPosition="start"
-            />
-            <Tab 
-              icon={<ProjectMapIcon />} 
-              label="Project Map" 
-              iconPosition="start"
-            />
+            <Tab icon={<MindMapIcon />} label="Mind Map" iconPosition="start" />
+            <Tab icon={<TimelineIcon />} label="Timeline" iconPosition="start" />
           </Tabs>
 
           <TabPanel value={tabValue} index={0}>
@@ -924,15 +809,7 @@ const Visualizations: React.FC = () => {
             <div ref={timelineRef} style={{ width: '100%', height: 300 }} />
           </TabPanel>
 
-          <TabPanel value={tabValue} index={2}>
-            <Typography variant="h6" sx={{ mb: 2 }}>
-              Project Clusters
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Interactive visualization of your research projects and their note counts
-            </Typography>
-            <div ref={projectMapRef} style={{ width: '100%', height: 400 }} />
-          </TabPanel>
+          {/* Project Map removed */}
         </CardContent>
       </Card>
     </Box>

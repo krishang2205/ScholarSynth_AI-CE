@@ -321,7 +321,10 @@ class StorageService {
 
   // Settings operations
   async saveSettings(settings: any): Promise<void> {
-    await chrome.storage.local.set({ settings });
+  // Merge with existing settings to avoid overwriting unrelated keys
+  const current = await this.getSettings();
+  const merged = { ...current, ...settings };
+  await chrome.storage.local.set({ settings: merged });
   }
 
   async getSettings(): Promise<any> {

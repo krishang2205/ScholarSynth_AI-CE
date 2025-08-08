@@ -15,6 +15,7 @@ const Settings: React.FC<SettingsProps> = () => {
 
   // Form states
   const [apiKey, setApiKey] = useState('');
+  const [darkMode, setDarkMode] = useState(false);
   const [profileForm, setProfileForm] = useState({
     topics: '',
     style: 'academic',
@@ -38,6 +39,10 @@ const Settings: React.FC<SettingsProps> = () => {
       if (settingsResponse.success && settingsResponse.data.settings) {
         setSettings(settingsResponse.data.settings);
         setApiKey(settingsResponse.data.settings.geminiApiKey || '');
+        if (typeof settingsResponse.data.settings.darkMode === 'boolean') {
+          setDarkMode(settingsResponse.data.settings.darkMode);
+          updateDocumentTheme(settingsResponse.data.settings.darkMode);
+        }
       }
 
       if (profileResponse.success && profileResponse.data.profile) {
@@ -83,6 +88,25 @@ const Settings: React.FC<SettingsProps> = () => {
       showMessage('error', 'Failed to save API key');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const updateDocumentTheme = (enabled: boolean) => {
+    const root = document.getElementById('root');
+    if (!root) return;
+    if (enabled) root.classList.add('dark'); else root.classList.remove('dark');
+  };
+
+  const handleToggleDarkMode = async () => {
+    const newValue = !darkMode;
+    setDarkMode(newValue);
+    updateDocumentTheme(newValue);
+    try {
+      await safeSendMessage({ type: 'SETTINGS_UPDATE', data: { darkMode: newValue } });
+    } catch (e) {
+      // fallback direct save using storage message already existing (reuse saveSettings path via SET_API_KEY not suitable) -> create generic save
+      // If background doesn't handle SETTINGS_UPDATE yet, we store directly via runtime message
+      try { await safeSendMessage({ type: 'SAVE_SETTINGS', data: { settings: { darkMode: newValue } } }); } catch {}
     }
   };
 
@@ -169,6 +193,23 @@ const Settings: React.FC<SettingsProps> = () => {
         <div className="card-content">
           {/* API Configuration */}
           <div className="form-section" style={{ marginBottom: '2rem' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'0.75rem' }}>
+              <h3 style={{ 
+                fontSize: 'var(--font-size-lg)', 
+                fontWeight: '600', 
+                color: 'var(--gray-800)',
+                margin: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                Appearance
+              </h3>
+              <label style={{ fontSize:'var(--font-size-sm)', display:'flex', alignItems:'center', gap:6, cursor:'pointer' }}>
+                <input type="checkbox" checked={darkMode} onChange={handleToggleDarkMode} style={{ cursor:'pointer' }} />
+                <span>{darkMode? 'Dark Mode':'Light Mode'}</span>
+              </label>
+            </div>
             <h3 style={{ 
               fontSize: 'var(--font-size-lg)', 
               fontWeight: '600', 
