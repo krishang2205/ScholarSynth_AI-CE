@@ -220,16 +220,25 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-#ai-rate-positive:hover {
-  background: #dcfce7;
-  border-color: #22c55e;
-  color: #16a34a;
+/* Themed rating buttons aligned with popup accent palette */
+#ai-rate-positive {
+  background: linear-gradient(135deg, var(--success-500, #22c55e) 0%, var(--success-600, #16a34a) 100%);
+  color: #fff;
+  border: none;
 }
-
-#ai-rate-negative:hover {
-  background: #fef2f2;
-  border-color: #ef4444;
-  color: #dc2626;
+#ai-rate-positive:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+#ai-rate-negative {
+  background: linear-gradient(135deg, var(--error-500, #ef4444) 0%, var(--error-600, #dc2626) 100%);
+  color: #fff;
+  border: none;
+}
+#ai-rate-negative:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+#ai-rate-positive:disabled, #ai-rate-negative:disabled {
+  opacity: 0.6;
 }
 
 .ai-rate-btn:disabled {

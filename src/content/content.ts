@@ -146,7 +146,7 @@ class ContentScript {
     if (positiveBtn) {
       positiveBtn.addEventListener('click', () => {
         this.rateSummary(note.id, 'positive');
-        (positiveBtn as HTMLElement).style.backgroundColor = '#4CAF50';
+        positiveBtn.setAttribute('disabled', 'true');
         negativeBtn?.setAttribute('disabled', 'true');
       });
     }
@@ -154,7 +154,7 @@ class ContentScript {
     if (negativeBtn) {
       negativeBtn.addEventListener('click', () => {
         this.rateSummary(note.id, 'negative');
-        (negativeBtn as HTMLElement).style.backgroundColor = '#f44336';
+        negativeBtn.setAttribute('disabled', 'true');
         positiveBtn?.setAttribute('disabled', 'true');
       });
     }
