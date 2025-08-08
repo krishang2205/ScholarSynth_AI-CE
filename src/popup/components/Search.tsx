@@ -163,28 +163,55 @@ const Search: React.FC = () => {
       {/* Search Input */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Box sx={{ display: 'flex', gap: 2 }}>
+          <Box sx={{ position: 'relative' }}>
             <TextField
               fullWidth
               variant="outlined"
-              placeholder="Search your notes semantically... (auto-search after typing)"
+              placeholder="Search your notes..."
               value={query}
               onChange={(e) => handleQueryChange(e.target.value)}
               onKeyPress={handleKeyPress}
               InputProps={{
                 startAdornment: (
-                  <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                  <SearchIcon sx={{ mr: 1, ml: 0.5, color: 'text.secondary' }} />
                 ),
                 endAdornment: loading && (
-                  <CircularProgress size={20} sx={{ mr: 1 }} />
+                  <CircularProgress size={18} sx={{ color: 'primary.main', mr: 6 }} />
                 ),
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  pr: 14, // space for button
+                  borderRadius: 2,
+                  background: '#fff',
+                  transition: 'box-shadow 0.15s',
+                  '&:hover': { boxShadow: '0 0 0 2px rgba(25,118,210,0.15)' },
+                  '&.Mui-focused': { boxShadow: '0 0 0 3px rgba(25,118,210,0.25)' }
+                },
+                '& input': { py: 1.1, fontSize: '0.9rem' }
               }}
             />
             <Button
               variant="contained"
+              disableElevation
               onClick={() => handleSearch()}
               disabled={loading || !query.trim()}
-              sx={{ minWidth: 100 }}
+              sx={{
+                position: 'absolute',
+                top: '50%',
+                right: 8,
+                transform: 'translateY(-50%)',
+                minWidth: 0,
+                px: 2,
+                height: 32,
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                borderRadius: '16px',
+                textTransform: 'none',
+                background: 'linear-gradient(90deg, #1976d2, #1565c0)',
+                '&:hover': { background: 'linear-gradient(90deg, #1565c0, #0d47a1)' },
+                '&.Mui-disabled': { background: '#e0e0e0', color: '#9e9e9e' }
+              }}
             >
               Search
             </Button>

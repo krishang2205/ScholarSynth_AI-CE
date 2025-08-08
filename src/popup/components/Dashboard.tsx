@@ -75,6 +75,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       .slice(0, 3);
   };
 
+  const getSnippet = (note: Note, max = 140) => {
+    const base = (note.summary && note.summary.trim().length > 0)
+      ? note.summary.trim()
+      : (note.content || '').trim();
+    if (!base) return '';
+    // Remove excessive whitespace/newlines
+    const clean = base.replace(/\s+/g, ' ');
+    return clean.length > max ? clean.substring(0, max).trim() + '…' : clean;
+  };
+
   if (loading) {
     return (
       <div className="loading-container">
@@ -224,8 +234,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             {recentNotes.map((note) => (
               <div key={note.id} className="note-item">
                 <div className="note-title">{note.title}</div>
-                <div className="note-summary">
-                  {note.summary || note.content.substring(0, 100) + '...'}
+                <div className="note-summary" style={{ fontSize: '0.8rem', color: '#555' }}>
+                  {getSnippet(note)}
                 </div>
                 <div className="note-meta">
                   <span>{new Date(note.createdAt).toLocaleDateString()}</span>
