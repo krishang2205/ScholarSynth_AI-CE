@@ -58,9 +58,12 @@ const Visualizations: React.FC = () => {
   // Mind map settings (phased implementation)
   const [maxTopics, setMaxTopics] = useState(8); // used in later phases
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null); // phase 2 detail panel
+  const [showConnections, setShowConnections] = useState(false); // phase 3 inline arcs toggle
+  const [showArcModal, setShowArcModal] = useState(false); // phase 3 modal
   const [loading, setLoading] = useState(true);
   
   const mindMapRef = useRef<HTMLDivElement>(null);
+  const arcModalRef = useRef<HTMLDivElement>(null); // container for arc modal graph
   // Track which topics are expanded in mind map
   const expandedTopicsRef = useRef<Set<string>>(new Set());
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -74,7 +77,12 @@ const Visualizations: React.FC = () => {
     if (notes.length > 0 && !loading) {
       renderVisualization();
     }
-  }, [notes, projects, tabValue, loading, selectedTopic]);
+  }, [notes, projects, tabValue, loading, selectedTopic, showConnections]);
+
+  useEffect(()=>{
+    if(showArcModal) renderArcModal();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[showArcModal, notes, maxTopics]);
 
   const loadData = async () => {
     try {
@@ -141,7 +149,7 @@ const Visualizations: React.FC = () => {
         }
       }
     });
-  // (Phase 1) We won't draw edges / connections yet.
+  // pairCount retained for connections / modal
 
   const width = container.clientWidth;
   const height = 400;
@@ -222,7 +230,31 @@ const Visualizations: React.FC = () => {
       .attr('stroke-dasharray','3 4');
 
     // Draw co-occurrence arcs above all
-  // (Phase 1) No connection arcs rendered.
+    // Inline connection arcs (Phase 3)
+    if(showConnections) {
+      const edges = Object.entries(pairCount)
+        .map(([key,count])=> { const [a,b]=key.split('||'); return {a,b,count}; })
+        .filter(e=> e.count>=2)
+        .sort((a,b)=> b.count - a.count)
+        .slice(0,10);
+      const arcLayer = svg.append('g').attr('class','inline-connections');
+      arcLayer.selectAll('path.inline-arc')
+        .data(edges)
+        .enter()
+        .append('path')
+        .attr('class','inline-arc')
+        .attr('d', e=> {
+          const p1 = topicPos[e.a]; const p2 = topicPos[e.b]; if(!p1||!p2) return '';
+          const mx = (p1.x+p2.x)/2; const my = (p1.y+p2.y)/2 - 40; // lift arc
+          return `M${p1.x},${p1.y} Q${mx},${my} ${p2.x},${p2.y}`;
+        })
+        .attr('fill','none')
+        .attr('stroke','#c95151')
+        .attr('stroke-width', e=> 0.6 + e.count)
+        .attr('opacity',0.25)
+        .on('mouseover', function(){ d3.select(this).attr('opacity',0.7); })
+        .on('mouseout', function(){ d3.select(this).attr('opacity',0.25); });
+    }
 
     // Topic groups
   const topicGroup = svg.append('g').attr('class','topics-layer').selectAll('g.topic')
@@ -351,7 +383,112 @@ const Visualizations: React.FC = () => {
           .text(d=> d.length>18? d.substring(0,17)+'…': d);
       }
     }
-  // end renderMindMap modifications phase 2
+  // end renderMindMap modifications phase 3
+  };
+
+  // Phase 3: Arc modal rendering
+  const renderArcModal = () => {
+    if(!arcModalRef.current) return;
+    const container = arcModalRef.current;
+    d3.select(container).selectAll('*').remove();
+    // build tag stats again
+    const tagCounts: Record<string, number> = {};
+    const notesByTag: Record<string, Note[]> = {};
+    notes.forEach(note => {
+      const uniqueTags = Array.from(new Set(note.tags || []));
+      uniqueTags.forEach(tag => {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+        (notesByTag[tag] = notesByTag[tag] || []).push(note);
+      });
+    });
+    const topics = Object.entries(tagCounts).sort((a,b)=> b[1]-a[1]).slice(0,maxTopics);
+    if(!topics.length) { container.innerHTML = '<div style="padding:12px;font-size:12px;">No topics</div>'; return; }
+    const topicSet = new Set(topics.map(t=>t[0]));
+    const pairCount: Record<string, number> = {};
+    notes.forEach(note => {
+      const rel = Array.from(new Set(note.tags.filter(t=>topicSet.has(t))));
+      for(let i=0;i<rel.length;i++) for(let j=i+1;j<rel.length;j++) {
+        const key = rel[i] < rel[j] ? `${rel[i]}||${rel[j]}` : `${rel[j]}||${rel[i]}`;
+        pairCount[key] = (pairCount[key]||0)+1;
+      }
+    });
+    const edges = Object.entries(pairCount)
+      .map(([key,count])=> { const [a,b]=key.split('||'); return {a,b,count}; })
+      .filter(e=> e.count>=1)
+      .sort((a,b)=> b.count - a.count)
+      .slice(0,40);
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    const cx = width/2; const cy = height/2; const R = Math.min(width,height)/2 - 70;
+    const angleStep = (2*Math.PI)/topics.length;
+    const topicPos: Record<string,{x:number,y:number,angle:number}> = {};
+    topics.forEach((t,i)=> {
+      const angle = i*angleStep - Math.PI/2;
+      topicPos[t[0]] = {x: cx + Math.cos(angle)*R, y: cy + Math.sin(angle)*R, angle};
+    });
+    const svg = d3.select(container)
+      .append('svg')
+      .attr('width',width)
+      .attr('height',height);
+    svg.append('rect').attr('width',width).attr('height',height).attr('rx',14).attr('fill','#FBF8F0');
+    // edges as inner arcs
+    const edgeGroup = svg.append('g').attr('class','modal-edges');
+    const maxCount = edges.length? d3.max(edges, e=> e.count)||1 : 1;
+    const scaleWidth = d3.scaleLinear().domain([1,maxCount]).range([0.6,4]);
+    edgeGroup.selectAll('path.edge')
+      .data(edges)
+      .enter()
+      .append('path')
+      .attr('class','edge')
+      .attr('d', e=> {
+        const a = topicPos[e.a]; const b = topicPos[e.b]; if(!a||!b) return '';
+        // draw curved inside path using midpoint outward
+        const mx = (a.x+b.x)/2; const my = (a.y+b.y)/2; const dx = cx - mx; const dy = cy - my;
+        const lift = 0.55;
+        const qx = mx + dx*lift; const qy = my + dy*lift;
+        return `M${a.x},${a.y} Q${qx},${qy} ${b.x},${b.y}`;
+      })
+      .attr('fill','none')
+      .attr('stroke','#b64646')
+      .attr('stroke-width', e=> scaleWidth(e.count))
+      .attr('opacity',0.22)
+      .on('mouseover', function(){ d3.select(this).attr('opacity',0.75); })
+      .on('mouseout', function(){ d3.select(this).attr('opacity',0.22); });
+    // topic nodes
+    const nodeGroup = svg.append('g').attr('class','modal-topics');
+    const g = nodeGroup.selectAll('g.topic')
+      .data(topics)
+      .enter()
+      .append('g')
+      .attr('class','topic')
+      .attr('transform', d=> `translate(${topicPos[d[0]].x},${topicPos[d[0]].y})`);
+    g.append('circle')
+      .attr('r', 26)
+      .attr('fill',(d,i)=> d3.schemeCategory10[i%10])
+      .attr('stroke','#333')
+      .attr('stroke-width',0.8)
+      .attr('opacity',0.9);
+    g.append('text')
+      .attr('text-anchor','middle')
+      .attr('y',-4)
+      .attr('fill','#fff')
+      .attr('font-size','11px')
+      .attr('font-weight','600')
+      .text(d=> d[0].length>10? d[0].substring(0,9)+'…': d[0]);
+    g.append('text')
+      .attr('text-anchor','middle')
+      .attr('y',10)
+      .attr('fill','#fff')
+      .attr('font-size','9px')
+      .text(d=> d[1]+ ' notes');
+    // legend small
+    svg.append('text')
+      .attr('x',cx)
+      .attr('y',30)
+      .attr('text-anchor','middle')
+      .attr('font-size','12px')
+      .attr('font-weight','600')
+      .text('Topic Connections');
   };
 
   const renderTimeline = () => {
@@ -587,19 +724,45 @@ const Visualizations: React.FC = () => {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Visual representation of your research topics and their connections
             </Typography>
-            {/* Phase 1: Minimal controls retained only for max topics (future phases may add more) */}
-            <Box sx={{ display:'flex', gap:1.5, mb:1, alignItems:'center' }}>
-              <label htmlFor="max-topics" style={{ fontSize:12 }}>Max topics:</label>
-              <select
-                id="max-topics"
-                value={maxTopics}
-                onChange={e=> setMaxTopics(parseInt(e.target.value)||8)}
-                style={{ fontSize:12, padding:'2px 4px', borderRadius:6 }}
-              >
-                {[4,6,8,10,12].map(n=> <option key={n} value={n}>{n}</option>)}
-              </select>
+            {/* Phase 3 controls: max topics + connections toggle + modal button */}
+            <Box sx={{ display:'flex', gap:2, mb:1.5, flexWrap:'wrap', alignItems:'center' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <label htmlFor="max-topics" style={{ fontSize:12 }}>Max topics:</label>
+                <select
+                  id="max-topics"
+                  value={maxTopics}
+                  onChange={e=> setMaxTopics(parseInt(e.target.value)||8)}
+                  style={{ fontSize:12, padding:'2px 4px', borderRadius:6 }}
+                >
+                  {[4,6,8,10,12].map(n=> <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                <input id="toggle-inline" type="checkbox" checked={showConnections} onChange={e=> setShowConnections(e.target.checked)} style={{ cursor:'pointer' }} />
+                <label htmlFor="toggle-inline" style={{ fontSize:12, cursor:'pointer' }}>Inline connections</label>
+              </div>
+              <button
+                onClick={()=> setShowArcModal(true)}
+                style={{ fontSize:12, padding:'4px 10px', borderRadius:18, border:'1px solid #b99d7a', background:'#fff8ef', cursor:'pointer' }}
+              >Open Connection Map</button>
             </Box>
-            <div ref={mindMapRef} style={{ width: '100%', height: 400 }} />
+            <Box sx={{ position:'relative' }}>
+              <div ref={mindMapRef} style={{ width: '100%', height: 400 }} />
+              {showArcModal && (
+                <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.35)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:10 }}>
+                  <div style={{ background:'#fff', width:'560px', maxWidth:'100%', height:'440px', borderRadius:18, padding:'14px 16px', boxShadow:'0 8px 24px rgba(0,0,0,0.25)', position:'relative', display:'flex', flexDirection:'column' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                      <span style={{ fontSize:14, fontWeight:600 }}>Topic Connection Map</span>
+                      <button onClick={()=> setShowArcModal(false)} style={{ border:'none', background:'transparent', fontSize:18, lineHeight:'18px', cursor:'pointer' }}>×</button>
+                    </div>
+                    <div ref={arcModalRef} style={{ flex:1, width:'100%' }} />
+                    <div style={{ textAlign:'right', marginTop:6 }}>
+                      <button onClick={()=> setShowArcModal(false)} style={{ fontSize:12, padding:'4px 12px', borderRadius:16, border:'1px solid #999', background:'#fafafa', cursor:'pointer' }}>Close</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Box>
           </TabPanel>
 
           <TabPanel value={tabValue} index={1}>
