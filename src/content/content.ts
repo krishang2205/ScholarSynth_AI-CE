@@ -26,8 +26,7 @@ class ContentScript {
       sendResponse({ received: true });
     });
 
-    // Handle text selection
-    document.addEventListener('mouseup', this.handleTextSelection.bind(this));
+  // Text selection summarize hint removed per request (no indicator shown now)
     
     // Close popup when clicking outside
     document.addEventListener('click', this.handleOutsideClick.bind(this));
@@ -36,53 +35,7 @@ class ContentScript {
     document.addEventListener('keydown', this.handleKeyDown.bind(this));
   }
 
-  private handleTextSelection(event: MouseEvent): void {
-    const selection = window.getSelection();
-    if (!selection || selection.toString().trim().length === 0) {
-      return;
-    }
-
-    // Don't show context menu if popup is already visible
-    if (this.isPopupVisible) {
-      return;
-    }
-
-    // Show a small indicator that text can be summarized
-    this.showSummarizeIndicator(event);
-  }
-
-  private showSummarizeIndicator(event: MouseEvent): void {
-    // Remove existing indicator
-    const existingIndicator = document.getElementById('ai-summarize-indicator');
-    if (existingIndicator) {
-      existingIndicator.remove();
-    }
-
-    // Create indicator
-    const indicator = document.createElement('div');
-    indicator.id = 'ai-summarize-indicator';
-    indicator.innerHTML = `
-      <div class="ai-indicator-content">
-        <span>Right-click to summarize with AI</span>
-      </div>
-    `;
-
-    // Position indicator near mouse
-    indicator.style.position = 'fixed';
-    indicator.style.left = `${event.clientX + 10}px`;
-    indicator.style.top = `${event.clientY - 40}px`;
-    indicator.style.zIndex = '10000';
-    indicator.style.pointerEvents = 'none';
-
-    document.body.appendChild(indicator);
-
-    // Remove indicator after 2 seconds
-    setTimeout(() => {
-      if (indicator.parentNode) {
-        indicator.remove();
-      }
-    }, 2000);
-  }
+  // handleTextSelection & showSummarizeIndicator removed
 
   private showSummaryPopup(note: Note, summary: string): void {
     // Remove existing popup
@@ -149,15 +102,17 @@ class ContentScript {
     popup.style.top = '20px';
     popup.style.right = '20px';
     popup.style.zIndex = '10001';
-    popup.style.width = '420px';
-    popup.style.maxWidth = 'calc(100vw - 40px)';
-    popup.style.maxHeight = '70vh';
+  popup.style.width = '440px';
+  popup.style.maxWidth = 'min(440px, calc(100vw - 32px))';
+  popup.style.maxHeight = '82vh';
+  popup.style.display = 'flex';
+  popup.style.flexDirection = 'column';
     popup.style.overflow = 'hidden';
     popup.style.borderRadius = '12px';
     popup.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.12)';
     popup.style.animation = 'slideInFromRight 0.3s ease-out';
 
-    document.body.appendChild(popup);
+  document.body.appendChild(popup);
     this.summaryPopup = popup;
     this.isPopupVisible = true;
 
