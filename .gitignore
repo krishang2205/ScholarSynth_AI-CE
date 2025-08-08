@@ -97,7 +97,7 @@ jspm_packages/
 # NOTE: api-config.ts is currently tracked and contains an API key. After rotating/removing the key,
 # you can remove it from git and rely on a local untracked override file (see patterns below).
 # Copy a sanitized template (e.g. api-config.example.ts) to api-config.local.ts with your real key.
-src/config/api-config.local.ts
+src/config/api-config.ts
 src/config/*secret*.ts
 src/config/*private*.ts
 secrets/
