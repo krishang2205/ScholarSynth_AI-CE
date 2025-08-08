@@ -87,6 +87,10 @@ const Visualizations: React.FC = () => {
     if (!mindMapRef.current) return;
     const container = mindMapRef.current;
     d3.select(container).selectAll('*').remove();
+  const darkMode = document.getElementById('root')?.classList.contains('dark');
+  const paletteLight = d3.schemeCategory10;
+  const paletteDark = ['#4cc9f0','#4895ef','#4361ee','#3a0ca3','#7209b7','#b5179e','#f72585','#ff8800','#ffd166','#06d6a0'];
+  const topicPalette = darkMode ? paletteDark : paletteLight;
 
     // Build tag stats
     const tagCounts: Record<string, number> = {};
@@ -139,7 +143,7 @@ const Visualizations: React.FC = () => {
       .attr('x',0).attr('y',0)
       .attr('width',width).attr('height',height)
       .attr('rx',18)
-      .attr('fill','#FCF9EE');
+      .attr('fill', darkMode ? '#162132' : '#FCF9EE');
 
     // defs (shadow only needed now)
     const defs = svg.append('defs');
@@ -154,8 +158,8 @@ const Visualizations: React.FC = () => {
       .attr('x', cx-74).attr('y', cy-32)
       .attr('width',148).attr('height',64)
       .attr('rx',18)
-      .attr('fill','#fff')
-      .attr('stroke','#888')
+      .attr('fill', darkMode ? '#1e293b' : '#fff')
+      .attr('stroke', darkMode ? '#475569' : '#888')
       .attr('stroke-width',1.2)
       .style('filter','url(#topicShadow)')
       .attr('opacity',0.9);
@@ -166,13 +170,14 @@ const Visualizations: React.FC = () => {
       .attr('dominant-baseline','middle')
       .attr('font-weight','600')
       .attr('font-size','13px')
+      .attr('fill', darkMode ? '#e2e8f0' : '#222')
       .text(subjectLabel);
     subjectGroup.append('text')
       .attr('x',cx)
       .attr('y',cy+18)
       .attr('text-anchor','middle')
       .attr('font-size','9px')
-      .attr('fill','#555')
+      .attr('fill', darkMode ? '#94a3b8' : '#555')
       .text(`${topics.length} / ${notes.length} notes`);
 
     // Precompute positions
@@ -211,7 +216,7 @@ const Visualizations: React.FC = () => {
       .attr('x1',cx).attr('y1',cy)
       .attr('x2', d=> topicPos[d[0]].x)
       .attr('y2', d=> topicPos[d[0]].y)
-      .attr('stroke','#e2d7c4')
+      .attr('stroke', darkMode ? '#2c3c52' : '#e2d7c4')
       .attr('stroke-width',1.1)
       .attr('stroke-dasharray','3 4');
 
@@ -261,8 +266,8 @@ const Visualizations: React.FC = () => {
       .attr('width', d=> topicPos[d[0]].width)
       .attr('height', CARD_H)
       .attr('rx', 8)
-      .attr('fill', (d,i)=> d3.schemeCategory10[i%10])
-      .attr('stroke','#333')
+      .attr('fill', (d,i)=> topicPalette[i%topicPalette.length])
+      .attr('stroke', darkMode ? '#0f172a' : '#333')
       .attr('stroke-width',0.6)
       .style('filter','url(#topicShadow)')
       .attr('opacity',0.85);
@@ -290,8 +295,8 @@ const Visualizations: React.FC = () => {
       .append('div')
       .style('position','absolute')
       .style('pointer-events','none')
-      .style('background','#1f1f1f')
-      .style('color','#fff')
+      .style('background', darkMode ? 'rgba(15,23,42,0.95)' : '#1f1f1f')
+      .style('color', darkMode ? '#f1f5f9' : '#fff')
       .style('padding','6px 8px')
       .style('font-size','11px')
       .style('border-radius','6px')
@@ -759,7 +764,7 @@ const Visualizations: React.FC = () => {
             <Box sx={{ position:'relative' }}>
               <div ref={mindMapRef} style={{ width: '100%', height: 400 }} />
               {/* Color legend (Phase 5) */}
-              <div style={{ position:'absolute', left:8, bottom:8, background:'rgba(255,255,255,0.85)', padding:'6px 8px', borderRadius:8, boxShadow:'0 2px 6px rgba(0,0,0,0.15)', maxWidth:'95%', fontSize:10 }}>
+              <div style={{ position:'absolute', left:8, bottom:8, background: (document.getElementById('root')?.classList.contains('dark')? 'rgba(30,41,59,0.9)':'rgba(255,255,255,0.85)'), color: document.getElementById('root')?.classList.contains('dark')? '#f1f5f9':'inherit', padding:'6px 8px', borderRadius:8, boxShadow:'0 2px 6px rgba(0,0,0,0.25)', maxWidth:'95%', fontSize:10 }}>
                 <strong style={{ fontSize:10 }}>Legend:</strong>{' '}
                 {(() => {
                   // Build legend from current SVG topics if available
