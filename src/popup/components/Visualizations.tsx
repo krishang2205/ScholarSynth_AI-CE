@@ -55,6 +55,8 @@ const Visualizations: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [notes, setNotes] = useState<Note[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  // Mind map settings (phased implementation)
+  const [maxTopics, setMaxTopics] = useState(8); // used in later phases
   const [loading, setLoading] = useState(true);
   
   const mindMapRef = useRef<HTMLDivElement>(null);
@@ -119,10 +121,8 @@ const Visualizations: React.FC = () => {
       });
     });
 
-    const allTopics = Object.entries(tagCounts)
-      .sort((a,b)=> b[1]-a[1]);
-    const MAX_TOPICS = 8;
-    const topics = allTopics.slice(0, MAX_TOPICS);
+  const allTopics = Object.entries(tagCounts).sort((a,b)=> b[1]-a[1]);
+  const topics = allTopics.slice(0, maxTopics);
     if (topics.length === 0) {
       container.innerHTML = '<div class="empty-state">No topics found</div>';
       return;
@@ -140,20 +140,16 @@ const Visualizations: React.FC = () => {
         }
       }
     });
-    const edges = Object.entries(pairCount)
-      .map(([key,count])=> { const [a,b]=key.split('||'); return {a,b,count}; })
-      .filter(e=> e.count>=2)
-      .sort((a,b)=> b.count - a.count)
-      .slice(0,6);
+  // (Phase 1) We won't draw edges / connections yet.
 
-    const width = container.clientWidth;
-    const height = 400;
+  const width = container.clientWidth;
+  const height = 400;
     const cx = width/2;
     const cy = height/2;
     const R = Math.min(width, height)/2 - 70;
     const angleStep = (2*Math.PI)/topics.length;
 
-    const svg = d3.select(container)
+  const svg = d3.select(container)
       .append('svg')
       .attr('width', width)
       .attr('height', height)
@@ -166,85 +162,69 @@ const Visualizations: React.FC = () => {
       .attr('rx',18)
       .attr('fill','#FCF9EE');
 
-    // defs for arrow + shadow
+    // defs (shadow only needed now)
     const defs = svg.append('defs');
-    defs.append('marker')
-      .attr('id','arrow-head')
-      .attr('viewBox','0 0 10 10')
-      .attr('refX',8).attr('refY',5)
-      .attr('markerWidth',6).attr('markerHeight',6)
-      .attr('orient','auto-start-reverse')
-      .append('path').attr('d','M 0 0 L 10 5 L 0 10 z').attr('fill','#c94f4f');
-    const filter = defs.append('filter').attr('id','topicShadow').attr('height','130%');
+    const filter = defs.append('filter').attr('id','topicShadow').attr('height','140%');
     filter.append('feDropShadow')
-      .attr('dx',0).attr('dy',2).attr('stdDeviation',3).attr('flood-color','#000').attr('flood-opacity',0.15);
+      .attr('dx',0).attr('dy',1).attr('stdDeviation',2).attr('flood-color','#000').attr('flood-opacity',0.2);
 
-    // Central subject
+    // Central subject label dynamic
+  const subjectLabel = 'Top Topics';
     const subjectGroup = svg.append('g').attr('class','subject-group');
     subjectGroup.append('rect')
-      .attr('x', cx-60).attr('y', cy-30)
-      .attr('width',120).attr('height',60)
-      .attr('rx',8)
+      .attr('x', cx-70).attr('y', cy-28)
+      .attr('width',140).attr('height',56)
+      .attr('rx',14)
       .attr('fill','#fff')
-      .attr('stroke','#555')
-      .attr('stroke-width',1.5)
-      .style('filter','url(#topicShadow)');
+      .attr('stroke','#888')
+      .attr('stroke-width',1.2)
+      .style('filter','url(#topicShadow)')
+      .attr('opacity',0.9);
     subjectGroup.append('text')
       .attr('x',cx)
-      .attr('y',cy)
+      .attr('y',cy-4)
       .attr('text-anchor','middle')
       .attr('dominant-baseline','middle')
       .attr('font-weight','600')
-      .attr('font-size','13px')
-      .text('Subject');
+      .attr('font-size','12px')
+      .text(subjectLabel);
+    subjectGroup.append('text')
+      .attr('x',cx)
+      .attr('y',cy+12)
+      .attr('text-anchor','middle')
+      .attr('font-size','10px')
+      .attr('fill','#555')
+      .text(`${topics.length} topics / ${notes.length} notes`);
 
     // Precompute positions
     const topicPos: Record<string,{x:number,y:number}> = {};
+    const CARD_H = 40;
     topics.forEach((t, i)=> {
       const angle = i*angleStep - Math.PI/2; // start top
       const x = cx + Math.cos(angle)*R;
-      const y = cy + Math.sin(angle)*R*0.85; // slight vertical squash
+      const y = cy + Math.sin(angle)*R;
       topicPos[t[0]] = {x,y};
     });
 
-    // Draw radial stems
-    svg.append('g').selectAll('path.stem')
+    // Group layers
+    const stemsLayer = svg.append('g');
+    stemsLayer.selectAll('line.stem')
       .data(topics)
       .enter()
-      .append('path')
+      .append('line')
       .attr('class','stem')
-      .attr('d', d=> {
-        const p = topicPos[d[0]]; return `M${cx},${cy} Q${(cx+p.x)/2},${(cy+p.y)/2} ${p.x},${p.y}`; })
-      .attr('fill','none')
-      .attr('stroke','#c5b69d')
-      .attr('stroke-width',1.2)
+      .attr('x1',cx).attr('y1',cy)
+      .attr('x2', d=> topicPos[d[0]].x)
+      .attr('y2', d=> topicPos[d[0]].y)
+      .attr('stroke','#e2d7c4')
+      .attr('stroke-width',1.1)
       .attr('stroke-dasharray','3 4');
 
     // Draw co-occurrence arcs above all
-    const arcGroup = svg.append('g').attr('class','connections');
-    arcGroup.selectAll('path.connection')
-      .data(edges)
-      .enter()
-      .append('path')
-      .attr('class','connection')
-      .attr('d', e => {
-        const p1 = topicPos[e.a];
-        const p2 = topicPos[e.b];
-        if(!p1||!p2) return '';
-        const mx = (p1.x + p2.x)/2;
-        const my = (p1.y + p2.y)/2 - 60; // raise arc
-        return `M${p1.x},${p1.y} Q${mx},${my} ${p2.x},${p2.y}`;
-      })
-      .attr('fill','none')
-      .attr('stroke','#d66')
-      .attr('stroke-width', e=> 0.8 + e.count)
-      .attr('marker-end','url(#arrow-head)')
-      .attr('opacity',0.4)
-      .on('mouseover', function(_,e){ d3.select(this).attr('opacity',0.85); })
-      .on('mouseout', function(){ d3.select(this).attr('opacity',0.4); });
+  // (Phase 1) No connection arcs rendered.
 
     // Topic groups
-    const topicGroup = svg.append('g').selectAll('g.topic')
+  const topicGroup = svg.append('g').attr('class','topics-layer').selectAll('g.topic')
       .data(topics, (d:any)=> d[0])
       .enter()
       .append('g')
@@ -255,9 +235,9 @@ const Visualizations: React.FC = () => {
     // Card background
     topicGroup.append('rect')
       .attr('x', -55)
-      .attr('y', -22)
+      .attr('y', -CARD_H/2)
       .attr('width', 110)
-      .attr('height', 44)
+      .attr('height', CARD_H)
       .attr('rx', 8)
       .attr('fill', (d,i)=> d3.schemeCategory10[i%10])
       .attr('stroke','#333')
@@ -279,67 +259,7 @@ const Visualizations: React.FC = () => {
       .attr('font-size','10px')
       .text(d=> `${d[1]} notes`);
 
-    // Detail groups (hidden until expanded)
-    const detailsGroup = topicGroup.append('g')
-      .attr('class','details')
-      .attr('transform','translate(65,0)')
-      .style('opacity', d => expandedTopicsRef.current.has(d[0])?1:0)
-      .style('pointer-events','none');
-
-    detailsGroup.each(function(d:any){
-      const group = d3.select(this);
-      const tag = d[0];
-      const relatedNotes = (notesByTag[tag]||[]).slice(0,3);
-      const secondaryCounts: Record<string,number> = {};
-      relatedNotes.forEach(n => {
-        n.tags.forEach(t => { if(t!==tag) secondaryCounts[t]=(secondaryCounts[t]||0)+1; });
-      });
-      const topSecondary = Object.entries(secondaryCounts).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]);
-      const boxHeight = 18 + relatedNotes.length*14 + (topSecondary.length?18:0);
-      group.append('rect')
-        .attr('x',0).attr('y', -boxHeight/2)
-        .attr('width', 140).attr('height', boxHeight)
-        .attr('rx',8)
-        .attr('fill','#fff')
-        .attr('stroke','#999');
-      group.append('text')
-        .attr('x',8).attr('y', -boxHeight/2 + 14)
-        .attr('font-size','11px')
-        .attr('font-weight','600')
-        .text('Notes');
-      relatedNotes.forEach((n,i)=> {
-        group.append('text')
-          .attr('x',10)
-          .attr('y', -boxHeight/2 + 28 + i*14)
-          .attr('font-size','10px')
-          .attr('fill','#333')
-          .text(n.title.length>24? n.title.substring(0,23)+'…': n.title)
-          .style('cursor','pointer')
-          .on('click',()=> { if(n.url) chrome.tabs.create({url: n.url}); });
-      });
-      if(topSecondary.length){
-        group.append('text')
-          .attr('x',8).attr('y', -boxHeight/2 + 28 + relatedNotes.length*14)
-          .attr('font-size','11px')
-          .attr('font-weight','600')
-          .text('Keywords');
-        topSecondary.forEach((t,i)=> {
-          group.append('text')
-            .attr('x',10)
-            .attr('y', -boxHeight/2 + 42 + relatedNotes.length*14 + i*14)
-            .attr('font-size','10px')
-            .attr('fill','#555')
-            .text(t.length>18? t.substring(0,17)+'…': t);
-        });
-      }
-    });
-
-    // Toggle expansion on click
-    topicGroup.on('click', function(event, d:any){
-      const tag = d[0];
-      if(expandedTopicsRef.current.has(tag)) expandedTopicsRef.current.delete(tag); else expandedTopicsRef.current.add(tag);
-      renderMindMap();
-    });
+  // (Phase 1) Click not yet used; future phases will add detail panel.
   };
 
   const renderTimeline = () => {
@@ -575,6 +495,18 @@ const Visualizations: React.FC = () => {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Visual representation of your research topics and their connections
             </Typography>
+            {/* Phase 1: Minimal controls retained only for max topics (future phases may add more) */}
+            <Box sx={{ display:'flex', gap:1.5, mb:1, alignItems:'center' }}>
+              <label htmlFor="max-topics" style={{ fontSize:12 }}>Max topics:</label>
+              <select
+                id="max-topics"
+                value={maxTopics}
+                onChange={e=> setMaxTopics(parseInt(e.target.value)||8)}
+                style={{ fontSize:12, padding:'2px 4px', borderRadius:6 }}
+              >
+                {[4,6,8,10,12].map(n=> <option key={n} value={n}>{n}</option>)}
+              </select>
+            </Box>
             <div ref={mindMapRef} style={{ width: '100%', height: 400 }} />
           </TabPanel>
 
