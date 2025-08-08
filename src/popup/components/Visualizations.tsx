@@ -75,9 +75,10 @@ const Visualizations: React.FC = () => {
 
   useEffect(() => {
     if (notes.length > 0 && !loading) {
+      // Only re-render mind map on mind-map specific state changes to avoid unnecessary work
       renderVisualization();
     }
-  }, [notes, projects, tabValue, loading, selectedTopic, showConnections]);
+  }, [notes, projects, tabValue, loading, selectedTopic, showConnections, maxTopics]);
 
   useEffect(()=>{
     if(showArcModal) renderArcModal();
@@ -509,17 +510,21 @@ const Visualizations: React.FC = () => {
     g.append('circle')
       .attr('r', 26)
       .attr('fill',(d,i)=> d3.schemeCategory10[i%10])
-      .attr('stroke','#333')
-      .attr('stroke-width',0.8)
-      .attr('opacity',0.9);
-    g.append('text')
+      .attr('stroke', d=> (selectedTopic && selectedTopic === d[0])? '#ffce4d':'#333')
+      .attr('stroke-width', d=> (selectedTopic && selectedTopic === d[0])? 3:0.8)
+      .attr('opacity', d=> (selectedTopic && selectedTopic !== d[0])? 0.55:0.9)
+      .style('cursor','pointer')
+      .on('click', (_evt,d:any)=> {
+        setSelectedTopic(prev => prev === d[0] ? null : d[0]);
+      });
+  g.append('text')
       .attr('text-anchor','middle')
       .attr('y',-4)
       .attr('fill','#fff')
       .attr('font-size','11px')
       .attr('font-weight','600')
       .text(d=> d[0].length>10? d[0].substring(0,9)+'…': d[0]);
-    g.append('text')
+  g.append('text')
       .attr('text-anchor','middle')
       .attr('y',10)
       .attr('fill','#fff')
@@ -533,6 +538,48 @@ const Visualizations: React.FC = () => {
       .attr('font-size','12px')
       .attr('font-weight','600')
       .text('Topic Connections');
+    // subtle hint
+    svg.append('text')
+      .attr('x', cx)
+      .attr('y', height - 16)
+      .attr('text-anchor','middle')
+      .attr('font-size','10px')
+      .attr('fill','#666')
+      .text('Click a circle to highlight a topic');
+  };
+
+  // Export current mind map SVG to PNG
+  const exportMindMapPNG = () => {
+    const container = mindMapRef.current;
+    if(!container) return;
+    const svgEl = container.querySelector('svg');
+    if(!svgEl) return;
+    const serializer = new XMLSerializer();
+    let source = serializer.serializeToString(svgEl);
+    if(!source.match(/^<svg[^>]+xmlns="http:\/\/www.w3.org\/2000\/svg"/)) {
+      source = source.replace('<svg','<svg xmlns="http://www.w3.org/2000/svg"');
+    }
+    source = '<?xml version="1.0" standalone="no"?>\r\n' + source;
+    const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(source);
+    const img = new Image();
+    const width = (svgEl as any).width.baseVal.value || 600;
+    const height = (svgEl as any).height.baseVal.value || 400;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if(ctx) {
+        ctx.fillStyle = '#FCF9EE';
+        ctx.fillRect(0,0,width,height);
+        ctx.drawImage(img,0,0);
+        const png = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.download = 'mindmap.png';
+        a.href = png;
+        a.click();
+      }
+    };
+    img.src = url;
   };
 
   const renderTimeline = () => {
@@ -789,9 +836,37 @@ const Visualizations: React.FC = () => {
                 onClick={()=> setShowArcModal(true)}
                 style={{ fontSize:12, padding:'4px 10px', borderRadius:18, border:'1px solid #b99d7a', background:'#fff8ef', cursor:'pointer' }}
               >Open Connection Map</button>
+              <button
+                onClick={exportMindMapPNG}
+                style={{ fontSize:12, padding:'4px 10px', borderRadius:18, border:'1px solid #6a8cbe', background:'#eef6ff', cursor:'pointer' }}
+              >Export PNG</button>
             </Box>
             <Box sx={{ position:'relative' }}>
               <div ref={mindMapRef} style={{ width: '100%', height: 400 }} />
+              {/* Color legend (Phase 5) */}
+              <div style={{ position:'absolute', left:8, bottom:8, background:'rgba(255,255,255,0.85)', padding:'6px 8px', borderRadius:8, boxShadow:'0 2px 6px rgba(0,0,0,0.15)', maxWidth:'95%', fontSize:10 }}>
+                <strong style={{ fontSize:10 }}>Legend:</strong>{' '}
+                {(() => {
+                  // Build legend from current SVG topics if available
+                  const container = mindMapRef.current; const labels: {color:string; label:string}[] = [];
+                  if(container) {
+                    const svgtopics = Array.from(container.querySelectorAll('g.topic')) as SVGGElement[];
+                    svgtopics.slice(0,8).forEach(g => {
+                      const rect = g.querySelector('rect');
+                      const text = g.querySelector('text');
+                      if(rect && text) {
+                        labels.push({ color: (rect as any).getAttribute('fill') || '#999', label: (text as any).textContent || '' });
+                      }
+                    });
+                  }
+                  return labels.map(l => (
+                    <span key={l.label} style={{ display:'inline-flex', alignItems:'center', marginRight:6, marginTop:2 }}>
+                      <span style={{ width:10, height:10, background:l.color, display:'inline-block', borderRadius:2, marginRight:3 }} />
+                      {l.label}
+                    </span>
+                  ));
+                })()}
+              </div>
               {showArcModal && (
                 <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.35)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:10 }}>
                   <div style={{ background:'#fff', width:'560px', maxWidth:'100%', height:'440px', borderRadius:18, padding:'14px 16px', boxShadow:'0 8px 24px rgba(0,0,0,0.25)', position:'relative', display:'flex', flexDirection:'column' }}>
