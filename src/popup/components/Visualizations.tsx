@@ -57,6 +57,7 @@ const Visualizations: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   // Mind map settings (phased implementation)
   const [maxTopics, setMaxTopics] = useState(8); // used in later phases
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null); // phase 2 detail panel
   const [loading, setLoading] = useState(true);
   
   const mindMapRef = useRef<HTMLDivElement>(null);
@@ -73,7 +74,7 @@ const Visualizations: React.FC = () => {
     if (notes.length > 0 && !loading) {
       renderVisualization();
     }
-  }, [notes, projects, tabValue, loading]);
+  }, [notes, projects, tabValue, loading, selectedTopic]);
 
   const loadData = async () => {
     try {
@@ -259,7 +260,98 @@ const Visualizations: React.FC = () => {
       .attr('font-size','10px')
       .text(d=> `${d[1]} notes`);
 
-  // (Phase 1) Click not yet used; future phases will add detail panel.
+    // Topic click -> toggle selection (Phase 2)
+    topicGroup.on('click', (event, d:any)=> {
+      const tag = d[0];
+      setSelectedTopic(prev => prev === tag ? null : tag);
+    });
+
+    // Detail panel (Phase 2)
+    if(selectedTopic && topicPos[selectedTopic]) {
+      const p = topicPos[selectedTopic];
+      const relatedNotes = (notesByTag[selectedTopic]||[]).slice(0,5);
+      const secondaryCounts: Record<string,number> = {};
+      relatedNotes.forEach(n => n.tags.forEach(t => { if(t!==selectedTopic) secondaryCounts[t]=(secondaryCounts[t]||0)+1; }));
+      const topSecondary = Object.entries(secondaryCounts).sort((a,b)=> b[1]-a[1]).slice(0,6).map(x=>x[0]);
+      const panelW = 190; const panelH = 170;
+      const fx = p.x + (p.x < cx ? 18 : -panelW-18); // position left/right
+      const fy = Math.min(Math.max(p.y - panelH/2, 8), height-panelH-8);
+      const foreign = svg.append('foreignObject')
+        .attr('x', fx)
+        .attr('y', fy)
+        .attr('width', panelW)
+        .attr('height', panelH)
+        .style('overflow','visible');
+      const div = foreign.append('xhtml:div')
+        .style('background','#ffffff')
+        .style('border','1px solid #e1dbcf')
+        .style('box-shadow','0 6px 14px rgba(0,0,0,0.16)')
+        .style('border-radius','14px')
+        .style('font-size','11px')
+        .style('padding','10px 10px 6px')
+        .style('width', panelW+'px')
+        .style('height', panelH+'px')
+        .style('display','flex')
+        .style('flexDirection','column')
+        .style('gap','6px');
+      const hdr = div.append('div')
+        .style('display','flex')
+        .style('alignItems','center')
+        .style('justifyContent','space-between');
+      hdr.append('span')
+        .style('font-weight','600')
+        .style('font-size','12px')
+        .style('color','#2d2a25')
+        .text(selectedTopic + ` (${relatedNotes.length})`);
+      hdr.append('button')
+        .text('×')
+        .style('background','transparent')
+        .style('border','none')
+        .style('font-size','14px')
+        .style('line-height','14px')
+        .style('cursor','pointer')
+        .style('color','#444')
+        .on('click', ()=> setSelectedTopic(null));
+      const list = div.append('div')
+        .style('flex','1')
+        .style('overflow','auto')
+        .style('border-top','1px solid #f0ece3')
+        .style('padding','4px 0 0');
+      relatedNotes.forEach(n => {
+        const item = list.append('div')
+          .style('padding','2px 0')
+          .style('cursor', n.url? 'pointer':'default')
+          .style('border-bottom','1px dashed #eee')
+          .text(n.title.length>55? n.title.substring(0,54)+'…': n.title)
+          .on('click', ()=> { if(n.url) chrome.tabs.create({url: n.url}); });
+      });
+      if(topSecondary.length) {
+        const kw = div.append('div')
+          .style('border-top','1px solid #f0ece3')
+          .style('padding','4px 0 0');
+        kw.append('div')
+          .style('font-weight','600')
+          .style('marginBottom','2px')
+          .style('font-size','11px')
+          .text('Keywords');
+        const tagWrap = kw.append('div')
+          .style('display','flex')
+          .style('flexWrap','wrap')
+          .style('gap','4px');
+        tagWrap.selectAll('span')
+          .data(topSecondary)
+          .enter()
+          .append('span')
+          .style('background','#f4efe7')
+          .style('border','1px solid #e1dbcf')
+          .style('border-radius','10px')
+          .style('padding','2px 6px')
+          .style('font-size','10px')
+          .style('color','#555')
+          .text(d=> d.length>18? d.substring(0,17)+'…': d);
+      }
+    }
+  // end renderMindMap modifications phase 2
   };
 
   const renderTimeline = () => {
