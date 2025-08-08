@@ -58,6 +58,8 @@ const Visualizations: React.FC = () => {
   const [loading, setLoading] = useState(true);
   
   const mindMapRef = useRef<HTMLDivElement>(null);
+  // Track which topics are expanded in mind map
+  const expandedTopicsRef = useRef<Set<string>>(new Set());
   const timelineRef = useRef<HTMLDivElement>(null);
   const projectMapRef = useRef<HTMLDivElement>(null);
 
@@ -103,91 +105,241 @@ const Visualizations: React.FC = () => {
 
   const renderMindMap = () => {
     if (!mindMapRef.current) return;
+    const container = mindMapRef.current;
+    d3.select(container).selectAll('*').remove();
 
-    // Clear previous content
-    d3.select(mindMapRef.current).selectAll("*").remove();
-
-    // Create mind map data
-    const topicCount: { [key: string]: number } = {};
+    // Build tag stats
+    const tagCounts: Record<string, number> = {};
+    const notesByTag: Record<string, Note[]> = {};
     notes.forEach(note => {
-      note.tags.forEach(tag => {
-        topicCount[tag] = (topicCount[tag] || 0) + 1;
+      const uniqueTags = Array.from(new Set(note.tags || []));
+      uniqueTags.forEach(tag => {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+        (notesByTag[tag] = notesByTag[tag] || []).push(note);
       });
     });
 
-    const topics = Object.entries(topicCount)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 10);
-
+    const allTopics = Object.entries(tagCounts)
+      .sort((a,b)=> b[1]-a[1]);
+    const MAX_TOPICS = 8;
+    const topics = allTopics.slice(0, MAX_TOPICS);
     if (topics.length === 0) {
-      mindMapRef.current.innerHTML = '<div class="empty-state">No topics found</div>';
+      container.innerHTML = '<div class="empty-state">No topics found</div>';
       return;
     }
 
-    const width = mindMapRef.current.clientWidth;
-    const height = 400;
+    // Co-occurrence counts among selected topics
+    const topicSet = new Set(topics.map(t=>t[0]));
+    const pairCount: Record<string, number> = {};
+    notes.forEach(note => {
+      const relevant = Array.from(new Set(note.tags.filter(t=>topicSet.has(t))));
+      for (let i=0;i<relevant.length;i++) {
+        for (let j=i+1;j<relevant.length;j++) {
+          const key = relevant[i] < relevant[j] ? `${relevant[i]}||${relevant[j]}` : `${relevant[j]}||${relevant[i]}`;
+          pairCount[key] = (pairCount[key]||0)+1;
+        }
+      }
+    });
+    const edges = Object.entries(pairCount)
+      .map(([key,count])=> { const [a,b]=key.split('||'); return {a,b,count}; })
+      .filter(e=> e.count>=2)
+      .sort((a,b)=> b.count - a.count)
+      .slice(0,6);
 
-    const svg = d3.select(mindMapRef.current)
+    const width = container.clientWidth;
+    const height = 400;
+    const cx = width/2;
+    const cy = height/2;
+    const R = Math.min(width, height)/2 - 70;
+    const angleStep = (2*Math.PI)/topics.length;
+
+    const svg = d3.select(container)
       .append('svg')
       .attr('width', width)
-      .attr('height', height);
+      .attr('height', height)
+      .attr('class','mindmap-svg');
 
-    const g = svg.append('g')
-      .attr('transform', `translate(${width / 2}, ${height / 2})`);
+    // Background
+    svg.append('rect')
+      .attr('x',0).attr('y',0)
+      .attr('width',width).attr('height',height)
+      .attr('rx',18)
+      .attr('fill','#FCF9EE');
 
-    // Create radial layout
-    const radius = Math.min(width, height) / 2 - 50;
-    const angleStep = (2 * Math.PI) / topics.length;
+    // defs for arrow + shadow
+    const defs = svg.append('defs');
+    defs.append('marker')
+      .attr('id','arrow-head')
+      .attr('viewBox','0 0 10 10')
+      .attr('refX',8).attr('refY',5)
+      .attr('markerWidth',6).attr('markerHeight',6)
+      .attr('orient','auto-start-reverse')
+      .append('path').attr('d','M 0 0 L 10 5 L 0 10 z').attr('fill','#c94f4f');
+    const filter = defs.append('filter').attr('id','topicShadow').attr('height','130%');
+    filter.append('feDropShadow')
+      .attr('dx',0).attr('dy',2).attr('stdDeviation',3).attr('flood-color','#000').attr('flood-opacity',0.15);
 
-    // Draw topic nodes
-    const topicNodes = g.selectAll('.topic-node')
+    // Central subject
+    const subjectGroup = svg.append('g').attr('class','subject-group');
+    subjectGroup.append('rect')
+      .attr('x', cx-60).attr('y', cy-30)
+      .attr('width',120).attr('height',60)
+      .attr('rx',8)
+      .attr('fill','#fff')
+      .attr('stroke','#555')
+      .attr('stroke-width',1.5)
+      .style('filter','url(#topicShadow)');
+    subjectGroup.append('text')
+      .attr('x',cx)
+      .attr('y',cy)
+      .attr('text-anchor','middle')
+      .attr('dominant-baseline','middle')
+      .attr('font-weight','600')
+      .attr('font-size','13px')
+      .text('Subject');
+
+    // Precompute positions
+    const topicPos: Record<string,{x:number,y:number}> = {};
+    topics.forEach((t, i)=> {
+      const angle = i*angleStep - Math.PI/2; // start top
+      const x = cx + Math.cos(angle)*R;
+      const y = cy + Math.sin(angle)*R*0.85; // slight vertical squash
+      topicPos[t[0]] = {x,y};
+    });
+
+    // Draw radial stems
+    svg.append('g').selectAll('path.stem')
       .data(topics)
+      .enter()
+      .append('path')
+      .attr('class','stem')
+      .attr('d', d=> {
+        const p = topicPos[d[0]]; return `M${cx},${cy} Q${(cx+p.x)/2},${(cy+p.y)/2} ${p.x},${p.y}`; })
+      .attr('fill','none')
+      .attr('stroke','#c5b69d')
+      .attr('stroke-width',1.2)
+      .attr('stroke-dasharray','3 4');
+
+    // Draw co-occurrence arcs above all
+    const arcGroup = svg.append('g').attr('class','connections');
+    arcGroup.selectAll('path.connection')
+      .data(edges)
+      .enter()
+      .append('path')
+      .attr('class','connection')
+      .attr('d', e => {
+        const p1 = topicPos[e.a];
+        const p2 = topicPos[e.b];
+        if(!p1||!p2) return '';
+        const mx = (p1.x + p2.x)/2;
+        const my = (p1.y + p2.y)/2 - 60; // raise arc
+        return `M${p1.x},${p1.y} Q${mx},${my} ${p2.x},${p2.y}`;
+      })
+      .attr('fill','none')
+      .attr('stroke','#d66')
+      .attr('stroke-width', e=> 0.8 + e.count)
+      .attr('marker-end','url(#arrow-head)')
+      .attr('opacity',0.4)
+      .on('mouseover', function(_,e){ d3.select(this).attr('opacity',0.85); })
+      .on('mouseout', function(){ d3.select(this).attr('opacity',0.4); });
+
+    // Topic groups
+    const topicGroup = svg.append('g').selectAll('g.topic')
+      .data(topics, (d:any)=> d[0])
       .enter()
       .append('g')
-      .attr('class', 'topic-node')
-      .attr('transform', (d, i) => {
-        const angle = i * angleStep;
-        const x = Math.cos(angle) * radius;
-        const y = Math.sin(angle) * radius;
-        return `translate(${x}, ${y})`;
+      .attr('class','topic')
+      .attr('transform', d=> `translate(${topicPos[d[0]].x},${topicPos[d[0]].y})`)
+      .style('cursor','pointer');
+
+    // Card background
+    topicGroup.append('rect')
+      .attr('x', -55)
+      .attr('y', -22)
+      .attr('width', 110)
+      .attr('height', 44)
+      .attr('rx', 8)
+      .attr('fill', (d,i)=> d3.schemeCategory10[i%10])
+      .attr('stroke','#333')
+      .attr('stroke-width',0.6)
+      .style('filter','url(#topicShadow)')
+      .attr('opacity',0.85);
+
+    topicGroup.append('text')
+      .attr('text-anchor','middle')
+      .attr('y', -4)
+      .attr('fill','#fff')
+      .attr('font-size','12px')
+      .attr('font-weight','600')
+      .text(d=> d[0]);
+    topicGroup.append('text')
+      .attr('text-anchor','middle')
+      .attr('y', 12)
+      .attr('fill','#fff')
+      .attr('font-size','10px')
+      .text(d=> `${d[1]} notes`);
+
+    // Detail groups (hidden until expanded)
+    const detailsGroup = topicGroup.append('g')
+      .attr('class','details')
+      .attr('transform','translate(65,0)')
+      .style('opacity', d => expandedTopicsRef.current.has(d[0])?1:0)
+      .style('pointer-events','none');
+
+    detailsGroup.each(function(d:any){
+      const group = d3.select(this);
+      const tag = d[0];
+      const relatedNotes = (notesByTag[tag]||[]).slice(0,3);
+      const secondaryCounts: Record<string,number> = {};
+      relatedNotes.forEach(n => {
+        n.tags.forEach(t => { if(t!==tag) secondaryCounts[t]=(secondaryCounts[t]||0)+1; });
       });
+      const topSecondary = Object.entries(secondaryCounts).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]);
+      const boxHeight = 18 + relatedNotes.length*14 + (topSecondary.length?18:0);
+      group.append('rect')
+        .attr('x',0).attr('y', -boxHeight/2)
+        .attr('width', 140).attr('height', boxHeight)
+        .attr('rx',8)
+        .attr('fill','#fff')
+        .attr('stroke','#999');
+      group.append('text')
+        .attr('x',8).attr('y', -boxHeight/2 + 14)
+        .attr('font-size','11px')
+        .attr('font-weight','600')
+        .text('Notes');
+      relatedNotes.forEach((n,i)=> {
+        group.append('text')
+          .attr('x',10)
+          .attr('y', -boxHeight/2 + 28 + i*14)
+          .attr('font-size','10px')
+          .attr('fill','#333')
+          .text(n.title.length>24? n.title.substring(0,23)+'…': n.title)
+          .style('cursor','pointer')
+          .on('click',()=> { if(n.url) chrome.tabs.create({url: n.url}); });
+      });
+      if(topSecondary.length){
+        group.append('text')
+          .attr('x',8).attr('y', -boxHeight/2 + 28 + relatedNotes.length*14)
+          .attr('font-size','11px')
+          .attr('font-weight','600')
+          .text('Keywords');
+        topSecondary.forEach((t,i)=> {
+          group.append('text')
+            .attr('x',10)
+            .attr('y', -boxHeight/2 + 42 + relatedNotes.length*14 + i*14)
+            .attr('font-size','10px')
+            .attr('fill','#555')
+            .text(t.length>18? t.substring(0,17)+'…': t);
+        });
+      }
+    });
 
-    // Add circles for topics
-    topicNodes.append('circle')
-      .attr('r', d => Math.min(20 + d[1] * 3, 50))
-      .attr('fill', (d, i) => d3.schemeCategory10[i % 10])
-      .attr('opacity', 0.7);
-
-    // Add topic labels
-    topicNodes.append('text')
-      .text(d => d[0])
-      .attr('text-anchor', 'middle')
-      .attr('dy', '0.35em')
-      .attr('font-size', '12px')
-      .attr('fill', 'white')
-      .attr('font-weight', 'bold');
-
-    // Add topic counts
-    topicNodes.append('text')
-      .text(d => d[1])
-      .attr('text-anchor', 'middle')
-      .attr('dy', '1.5em')
-      .attr('font-size', '10px')
-      .attr('fill', 'white');
-
-    // Draw connections to center
-    g.selectAll('.connection')
-      .data(topics)
-      .enter()
-      .append('line')
-      .attr('class', 'connection')
-      .attr('x1', 0)
-      .attr('y1', 0)
-      .attr('x2', (d, i) => Math.cos(i * angleStep) * radius)
-      .attr('y2', (d, i) => Math.sin(i * angleStep) * radius)
-      .attr('stroke', '#ccc')
-      .attr('stroke-width', 1)
-      .attr('opacity', 0.5);
+    // Toggle expansion on click
+    topicGroup.on('click', function(event, d:any){
+      const tag = d[0];
+      if(expandedTopicsRef.current.has(tag)) expandedTopicsRef.current.delete(tag); else expandedTopicsRef.current.add(tag);
+      renderMindMap();
+    });
   };
 
   const renderTimeline = () => {

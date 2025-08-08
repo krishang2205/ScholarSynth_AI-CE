@@ -872,6 +872,16 @@ html, body {
   animation: fadeIn 0.3s ease-out;
 }
 
+/* Mind Map Enhancements */
+.mindmap-svg { font-family: 'Inter', sans-serif; }
+.mindmap-svg .topic rect { transition: transform 0.25s ease, filter 0.25s ease; }
+.mindmap-svg .topic:hover rect { transform: scale(1.05); filter: brightness(1.05); }
+.mindmap-svg .topic text { pointer-events: none; }
+.mindmap-svg .connection { cursor: pointer; }
+.mindmap-svg .details { transition: opacity 0.3s ease; }
+.mindmap-svg .stem { pointer-events: none; }
+
+
 .slide-in {
   animation: slideIn 0.3s ease-out;
 }
