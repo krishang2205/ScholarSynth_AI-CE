@@ -37,7 +37,6 @@ interface TabPanelProps {
 
 function TabPanel(props: TabPanelProps) {
   const { children, value, index, ...other } = props;
-
   return (
     <div
       role="tabpanel"
@@ -46,7 +45,7 @@ function TabPanel(props: TabPanelProps) {
       aria-labelledby={`visualization-tab-${index}`}
       {...other}
     >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+      {value === index && <Box sx={{ p: 2, pt: 1.5 }}>{children}</Box>}
     </div>
   );
 }
@@ -153,11 +152,12 @@ const Visualizations: React.FC = () => {
   // pairCount retained for connections / modal
 
   const width = container.clientWidth;
-  const height = 400;
-    const cx = width/2;
-    const cy = height/2;
-    const R = Math.min(width, height)/2 - 70;
-    const angleStep = (2*Math.PI)/topics.length;
+  const height = 380; // further enlarged to use remaining popup space
+  const cx = width/2;
+  const cy = height/2;
+  const baseR = Math.min(width, height)/2 - 55; // expand radius a bit more
+  const angleStep = (2*Math.PI)/topics.length;
+  let R = baseR;
 
   const svg = d3.select(container)
       .append('svg')
@@ -182,9 +182,9 @@ const Visualizations: React.FC = () => {
   const subjectLabel = 'Top Topics';
     const subjectGroup = svg.append('g').attr('class','subject-group');
     subjectGroup.append('rect')
-      .attr('x', cx-70).attr('y', cy-28)
-      .attr('width',140).attr('height',56)
-      .attr('rx',14)
+      .attr('x', cx-74).attr('y', cy-32)
+      .attr('width',148).attr('height',64)
+      .attr('rx',18)
       .attr('fill','#fff')
       .attr('stroke','#888')
       .attr('stroke-width',1.2)
@@ -192,33 +192,45 @@ const Visualizations: React.FC = () => {
       .attr('opacity',0.9);
     subjectGroup.append('text')
       .attr('x',cx)
-      .attr('y',cy-4)
+      .attr('y',cy-8)
       .attr('text-anchor','middle')
       .attr('dominant-baseline','middle')
       .attr('font-weight','600')
-      .attr('font-size','12px')
+      .attr('font-size','13px')
       .text(subjectLabel);
     subjectGroup.append('text')
       .attr('x',cx)
-      .attr('y',cy+12)
+      .attr('y',cy+18)
       .attr('text-anchor','middle')
-      .attr('font-size','10px')
+      .attr('font-size','9px')
       .attr('fill','#555')
-      .text(`${topics.length} topics / ${notes.length} notes`);
+      .text(`${topics.length} / ${notes.length} notes`);
 
     // Precompute positions
     const topicPos: Record<string,{x:number,y:number,width:number,count:number}> = {};
     const counts = topics.map(t=> t[1]);
     const minC = d3.min(counts) || 1;
     const maxC = d3.max(counts) || 1;
-    const widthScale = d3.scaleLinear().domain([minC,maxC]).range([90,150]);
-    const CARD_H = 40;
-    topics.forEach((t, i)=> {
-      const angle = i*angleStep - Math.PI/2; // start top
+  const widthScaleRaw = d3.scaleLinear().domain([minC,maxC]).range([100,170]);
+    const gap = 10;
+    const chord = (r:number)=> 2*r*Math.sin(angleStep/2);
+    const maxAllowedWidth = chord(R) - gap;
+    const widthScale = (c:number) => {
+      const proposed = widthScaleRaw(c);
+      if(maxAllowedWidth < 70) return Math.max(52, maxAllowedWidth - 4);
+      return Math.min(proposed, maxAllowedWidth);
+    };
+    const baseH = 40;
+    topics.forEach((t,i)=> {
+      const angle = i*angleStep - Math.PI/2;
       const x = cx + Math.cos(angle)*R;
       const y = cy + Math.sin(angle)*R;
-      topicPos[t[0]] = {x,y,width: widthScale(t[1]), count: t[1]};
+      const w = widthScale(t[1]);
+      topicPos[t[0]] = {x,y,width:w,count:t[1]};
     });
+    const avgW = d3.mean(Object.values(topicPos), p=> p.width) || 90;
+    const scaleH = avgW < 80 ? 0.78 : avgW < 95 ? 0.9 : 1;
+    const CARD_H = Math.round(baseH * scaleH);
 
     // Group layers
     const stemsLayer = svg.append('g');
@@ -290,15 +302,19 @@ const Visualizations: React.FC = () => {
       .attr('text-anchor','middle')
       .attr('y', -4)
       .attr('fill','#fff')
-      .attr('font-size','12px')
+      .attr('font-size', d=> (topicPos[d[0]].width < 70 ? '10px' : '11px'))
       .attr('font-weight','600')
-      .text(d=> d[0]);
+      .text(d=> {
+        const w = topicPos[d[0]].width;
+        const limit = w < 65 ? 8 : w < 80 ? 10 : w < 95 ? 14 : 18;
+        return d[0].length > limit ? d[0].substring(0, limit-1)+'…' : d[0];
+      });
     topicGroup.append('text')
       .attr('text-anchor','middle')
       .attr('y', 12)
       .attr('fill','#fff')
-      .attr('font-size','10px')
-      .text(d=> `${d[1]} notes`);
+      .attr('font-size', d=> (topicPos[d[0]].width < 70 ? '9px' : '10px'))
+      .text(d=> `${d[1]}`);
 
     // Tooltip (Phase 4)
     const tooltip = d3.select(container)
@@ -778,8 +794,11 @@ const Visualizations: React.FC = () => {
   }
 
   return (
-    <Box sx={{ pb: 7 }}>
-      <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
+    <Box sx={{ pb: 4, pt: 0 }}>
+      <Typography
+        variant="h6"
+        sx={{ m: 0, mb: 1, fontWeight: 600, lineHeight: 1.2, pt: 0 }}
+      >
         Visualizations
       </Typography>
 
@@ -789,7 +808,18 @@ const Visualizations: React.FC = () => {
             value={tabValue}
             onChange={handleTabChange}
             variant="fullWidth"
-            sx={{ borderBottom: 1, borderColor: 'divider' }}
+            sx={{
+              borderBottom: 1,
+              borderColor: 'divider',
+              minHeight: 40,
+              '& .MuiTab-root': {
+                minHeight: 40,
+                py: 0.5,
+                px: 1.5,
+                fontSize: 13,
+              },
+              '& .MuiTabs-indicator': { height: 2 }
+            }}
           >
             <Tab 
               icon={<MindMapIcon />} 
