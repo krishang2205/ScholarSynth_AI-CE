@@ -206,13 +206,17 @@ const Visualizations: React.FC = () => {
       .text(`${topics.length} topics / ${notes.length} notes`);
 
     // Precompute positions
-    const topicPos: Record<string,{x:number,y:number}> = {};
+    const topicPos: Record<string,{x:number,y:number,width:number,count:number}> = {};
+    const counts = topics.map(t=> t[1]);
+    const minC = d3.min(counts) || 1;
+    const maxC = d3.max(counts) || 1;
+    const widthScale = d3.scaleLinear().domain([minC,maxC]).range([90,150]);
     const CARD_H = 40;
     topics.forEach((t, i)=> {
       const angle = i*angleStep - Math.PI/2; // start top
       const x = cx + Math.cos(angle)*R;
       const y = cy + Math.sin(angle)*R;
-      topicPos[t[0]] = {x,y};
+      topicPos[t[0]] = {x,y,width: widthScale(t[1]), count: t[1]};
     });
 
     // Group layers
@@ -263,13 +267,16 @@ const Visualizations: React.FC = () => {
       .append('g')
       .attr('class','topic')
       .attr('transform', d=> `translate(${topicPos[d[0]].x},${topicPos[d[0]].y})`)
-      .style('cursor','pointer');
+      .style('cursor','pointer')
+      .attr('tabindex',0)
+      .attr('role','button')
+      .attr('aria-label', d=> `Topic ${d[0]} with ${d[1]} notes`);
 
     // Card background
     topicGroup.append('rect')
-      .attr('x', -55)
+      .attr('x', d=> -topicPos[d[0]].width/2)
       .attr('y', -CARD_H/2)
-      .attr('width', 110)
+      .attr('width', d=> topicPos[d[0]].width)
       .attr('height', CARD_H)
       .attr('rx', 8)
       .attr('fill', (d,i)=> d3.schemeCategory10[i%10])
@@ -291,6 +298,43 @@ const Visualizations: React.FC = () => {
       .attr('fill','#fff')
       .attr('font-size','10px')
       .text(d=> `${d[1]} notes`);
+
+    // Tooltip (Phase 4)
+    const tooltip = d3.select(container)
+      .append('div')
+      .style('position','absolute')
+      .style('pointer-events','none')
+      .style('background','#1f1f1f')
+      .style('color','#fff')
+      .style('padding','6px 8px')
+      .style('font-size','11px')
+      .style('border-radius','6px')
+      .style('box-shadow','0 4px 12px rgba(0,0,0,0.25)')
+      .style('opacity',0)
+      .style('transition','opacity 120ms');
+
+    topicGroup
+      .on('mouseenter', function(event, d:any){
+        // highlight stems and arcs connected
+        const tag = d[0];
+        d3.select(this).select('rect').attr('opacity',1);
+        tooltip.style('opacity',1).html(`<strong>${tag}</strong><br/>${d[1]} notes`);
+      })
+      .on('mousemove', function(event){
+        const [mx,my] = d3.pointer(event, container as any);
+        tooltip.style('left', (mx+12)+'px').style('top', (my+12)+'px');
+      })
+      .on('mouseleave', function(){
+        d3.select(this).select('rect').attr('opacity',0.85);
+        tooltip.style('opacity',0);
+      })
+      .on('keydown', (event, d:any)=> {
+        if(event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          const tag = d[0];
+          setSelectedTopic(prev => prev === tag ? null : tag);
+        }
+      });
 
     // Topic click -> toggle selection (Phase 2)
     topicGroup.on('click', (event, d:any)=> {
