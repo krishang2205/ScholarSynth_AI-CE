@@ -19,6 +19,7 @@ import {
 } from '@mui/icons-material';
 import { ChatMessage } from '../../types';
 import { aiService } from '../../services/ai';
+import { safeSendMessage } from '../../utils/message-utils';
 
 const Chat: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -77,11 +78,12 @@ const Chat: React.FC = () => {
     setLoading(true);
 
     try {
-      // First, search for relevant notes
-      const searchResponse = await chrome.runtime.sendMessage({
-        type: 'SEARCH_NOTES',
-        data: { query: input.trim(), limit: 5 }
-      });
+      // Fetch settings & user profile in parallel for accurate user context
+      const [searchResponse, profileResp, settingsResp] = await Promise.all([
+        chrome.runtime.sendMessage({ type: 'SEARCH_NOTES', data: { query: input.trim(), limit: 5 } }),
+        safeSendMessage({ type: 'GET_USER_PROFILE' }),
+        safeSendMessage({ type: 'GET_SETTINGS' })
+      ]);
       const relatedIds = searchResponse.results?.map((r: any) => r.note.id) || [];
       const context: string[] = searchResponse.results ? searchResponse.results.map((result: any) => 
         `Title: ${result.note.title}\nSummary: ${result.note.summary}\nContent: ${result.note.content}`) : [];
@@ -99,13 +101,28 @@ const Chat: React.FC = () => {
       };
       setMessages(prev => [...prev, assistantMessage]);
 
+      // Determine user profile (fallback minimal if unavailable)
+      const userProfile = profileResp?.profile || {
+        userId: 'temp-user',
+        topics: [],
+        style: 'academic',
+        verbosity: 'concise',
+        preferredLength: 'short',
+        researchFocus: [],
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      // Ensure aiService has key loaded (lazy init inside makeGeminiRequest too)
+      try { await aiService.initialize(); } catch (e) { console.warn('AI init in chat failed (will rely on lazy):', e); }
+
       // Streaming simulation using aiService wrapper
       abortRef.current = new AbortController();
       try {
         await aiService.answerQueryStream(
           input.trim(),
           context,
-          { topics: [], style: 'academic', verbosity: 'concise', preferredLength: 'short', researchFocus: [], createdAt: new Date(), updatedAt: new Date(), userId: 'temp-user' } as any,
+          userProfile as any,
           (chunk) => {
             setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: m.content + chunk } : m));
           },
@@ -115,7 +132,10 @@ const Chat: React.FC = () => {
         if ((e as any).message === 'aborted') {
           setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: m.content + ' [stopped]', streaming: false } : m));
         } else {
-          setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: 'Error generating response.', streaming: false } : m));
+          const errMsg = (e as any)?.message?.includes('API key not configured')
+            ? 'AI key missing. Set an API key in Settings.'
+            : 'Error generating response.';
+          setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: errMsg, streaming: false } : m));
         }
       }
 

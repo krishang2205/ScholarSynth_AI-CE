@@ -23,6 +23,14 @@ class AIService {
   }
 
   private async makeGeminiRequest(url: string, data: any): Promise<any> {
+    // Lazy init if not yet initialized in this context (popup may import without background init)
+    if (!this.geminiApiKey) {
+      try {
+        await this.initialize();
+      } catch (e) {
+        console.error('AIService lazy initialize failed:', e);
+      }
+    }
     if (!this.geminiApiKey || this.geminiApiKey === 'YOUR_GEMINI_API_KEY_HERE') {
       throw new Error('Gemini API key not configured. Please contact the developer or add your own API key in Settings.');
     }
