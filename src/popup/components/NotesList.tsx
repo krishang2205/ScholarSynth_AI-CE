@@ -29,6 +29,7 @@ import {
   OpenInNew as OpenInNewIcon,
   Star as StarIcon
 } from '@mui/icons-material';
+import { ExpandMore, ExpandLess } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { Note } from '../../types';
 
@@ -45,6 +46,8 @@ const NotesList: React.FC = () => {
     tags: '',
     project: ''
   });
+  // Track which note summaries are expanded
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     loadNotes();
@@ -210,12 +213,33 @@ const NotesList: React.FC = () => {
                       }
                       secondary={
                         <Box>
-                          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                            {note.summary.length > 150 
-                              ? `${note.summary.substring(0, 150)}...` 
-                              : note.summary
-                            }
-                          </Typography>
+                          <Box sx={{ position: 'relative', mb: 1, pr: 4 }}>
+                            <Typography 
+                              variant="body2" 
+                              color="text.secondary" 
+                              sx={{ whiteSpace: 'pre-wrap' }}
+                            >
+                              {expanded[note.id]
+                                ? note.summary
+                                : (note.summary.length > 150 ? `${note.summary.substring(0, 150)}...` : note.summary)
+                              }
+                            </Typography>
+                            {note.summary.length > 150 && (
+                              <IconButton
+                                size="small"
+                                aria-label={expanded[note.id] ? 'Collapse summary' : 'Expand summary'}
+                                onClick={() => setExpanded(prev => ({ ...prev, [note.id]: !prev[note.id] }))}
+                                sx={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  right: 0,
+                                  transform: 'translateY(-4px)'
+                                }}
+                              >
+                                {expanded[note.id] ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                              </IconButton>
+                            )}
+                          </Box>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                             <Typography variant="caption" color="text.secondary">
                               {format(new Date(note.createdAt), 'MMM d, yyyy')}
