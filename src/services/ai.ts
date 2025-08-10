@@ -355,6 +355,28 @@ Answer:`;
     }
   }
 
+  async answerQueryStream(
+    query: string,
+    relevantNotes: string[],
+    userProfile: UserProfile,
+    onChunk: (text: string) => void,
+    signal?: AbortSignal
+  ): Promise<string> {
+    // Currently Gemini REST here doesn't expose streaming via this wrapper; simulate chunking
+    const full = await this.answerQuery(query, relevantNotes, userProfile);
+    if (signal?.aborted) throw new Error('aborted');
+    const words = full.split(/(\s+)/); // keep spaces
+    let assembled = '';
+    for (let i = 0; i < words.length; i += 10) {
+      if (signal?.aborted) throw new Error('aborted');
+      const chunk = words.slice(i, i + 10).join('');
+      assembled += chunk;
+      onChunk(chunk);
+      await new Promise(r => setTimeout(r, 40));
+    }
+    return assembled;
+  }
+
   async extractTopics(text: string): Promise<string[]> {
     try {
       const prompt = `Extract the main topics and key concepts from the following text. Return only the topics as a comma-separated list, without explanations.

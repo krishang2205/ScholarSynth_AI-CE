@@ -18,11 +18,13 @@ import {
   Person as PersonIcon
 } from '@mui/icons-material';
 import { ChatMessage } from '../../types';
+import { aiService } from '../../services/ai';
 
 const Chat: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -80,69 +82,68 @@ const Chat: React.FC = () => {
         type: 'SEARCH_NOTES',
         data: { query: input.trim(), limit: 5 }
       });
+      const relatedIds = searchResponse.results?.map((r: any) => r.note.id) || [];
+      const context: string[] = searchResponse.results ? searchResponse.results.map((result: any) => 
+        `Title: ${result.note.title}\nSummary: ${result.note.summary}\nContent: ${result.note.content}`) : [];
 
-      let context: string[] = [];
-      if (searchResponse.results) {
-        context = searchResponse.results.map((result: any) => 
-          `Title: ${result.note.title}\nSummary: ${result.note.summary}\nContent: ${result.note.content}`
+      // Create streaming assistant placeholder
+      const assistantId = crypto.randomUUID();
+      const assistantMessage: ChatMessage = {
+        id: assistantId,
+        userId: 'temp-user',
+        type: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        relatedNotes: relatedIds,
+        streaming: true
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+
+      // Streaming simulation using aiService wrapper
+      abortRef.current = new AbortController();
+      try {
+        await aiService.answerQueryStream(
+          input.trim(),
+          context,
+          { topics: [], style: 'academic', verbosity: 'concise', preferredLength: 'short', researchFocus: [], createdAt: new Date(), updatedAt: new Date(), userId: 'temp-user' } as any,
+          (chunk) => {
+            setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: m.content + chunk } : m));
+          },
+          abortRef.current.signal
         );
+      } catch (e) {
+        if ((e as any).message === 'aborted') {
+          setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: m.content + ' [stopped]', streaming: false } : m));
+        } else {
+          setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: 'Error generating response.', streaming: false } : m));
+        }
       }
 
-      // Get AI answer using RAG
-      const answerResponse = await chrome.runtime.sendMessage({
-        type: 'ANSWER_QUERY',
-        data: { 
-          query: input.trim(), 
-          context: context 
-        }
-      });
+      // mark streaming done
+      setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, streaming: false } : m));
 
-      if (answerResponse.answer) {
-        const assistantMessage: ChatMessage = {
-          id: crypto.randomUUID(),
-          userId: 'temp-user', // Will be set by storage service
-          type: 'assistant',
-          content: answerResponse.answer,
-          timestamp: new Date(),
-          relatedNotes: searchResponse.results?.map((r: any) => r.note.id) || []
-        };
+      // Save messages
+      try {
+        await chrome.runtime.sendMessage({ type: 'SAVE_CHAT_MESSAGE', data: { message: userMessage } });
+        const finalAssistant = (messagesRef.current || []).find(m => m.id === assistantId) || assistantMessage;
+        await chrome.runtime.sendMessage({ type: 'SAVE_CHAT_MESSAGE', data: { message: { ...finalAssistant, streaming: undefined } } });
+      } catch (saveErr) { console.error('Save error', saveErr); }
 
-        setMessages(prev => [...prev, assistantMessage]);
-
-        // Save messages to storage
-        try {
-          await chrome.runtime.sendMessage({
-            type: 'SAVE_CHAT_MESSAGE',
-            data: { message: userMessage }
-          });
-          console.log('User message saved successfully');
-          
-          await chrome.runtime.sendMessage({
-            type: 'SAVE_CHAT_MESSAGE',
-            data: { message: assistantMessage }
-          });
-          console.log('Assistant message saved successfully');
-        } catch (saveError) {
-          console.error('Error saving chat messages:', saveError);
-        }
-      } else {
-        throw new Error('No answer received');
-      }
     } catch (error) {
       console.error('Error getting AI response:', error);
-      
-      const errorMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        userId: 'temp-user', // Will be set by storage service
-        type: 'assistant',
-        content: 'Sorry, I encountered an error while processing your question. Please try again.',
-        timestamp: new Date()
-      };
-
+      const errorMessage: ChatMessage = { id: crypto.randomUUID(), userId: 'temp-user', type: 'assistant', content: 'Sorry, error occurred. Please retry.', timestamp: new Date() };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setLoading(false);
     }
+  };
+
+  // keep ref to messages for save
+  const messagesRef = useRef<ChatMessage[]>(messages);
+  useEffect(()=>{ messagesRef.current = messages; }, [messages]);
+
+  const handleStop = () => {
+    abortRef.current?.abort();
   };
 
   const handleKeyPress = (event: React.KeyboardEvent) => {
@@ -232,7 +233,8 @@ const Chat: React.FC = () => {
                   <Paper sx={{ p: 2, bgcolor: 'grey.100', borderRadius: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <CircularProgress size={16} />
-                      <Typography variant="body2">Thinking...</Typography>
+                      <Typography variant="body2">Generating...</Typography>
+                      <Button size="small" onClick={handleStop}>Stop</Button>
                     </Box>
                   </Paper>
                 </Box>

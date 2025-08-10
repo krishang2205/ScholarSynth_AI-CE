@@ -33,6 +33,7 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   relatedNotes?: string[]; // Note IDs
+  streaming?: boolean; // transient ui state
 }
 
 export interface Project {
