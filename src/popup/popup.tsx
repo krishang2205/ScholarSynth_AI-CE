@@ -11,6 +11,8 @@ import User from './components/User';
 import Auth from './components/Auth';
 import { authService } from '../services/auth';
 import { safeSendMessage } from '../utils/message-utils';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { ToastProvider } from './components/common/ToastProvider';
 
 type ViewType = 'dashboard' | 'notes' | 'search' | 'chat' | 'settings' | 'visualizations' | 'user';
 
@@ -106,33 +108,31 @@ function App() {
   };
 
   return (
-    <div className="app-container">
-      {/* Header with Brand */}
-      <div className="header">
-        <div className="brand">
-          <div className="brand-icon"></div>
-          <div>
-            <div className="brand-title">ScholarSynth AI</div>
-            <div className="brand-subtitle">AI-Powered Research Assistant</div>
+    <ErrorBoundary>
+      <ToastProvider>
+        <div className="app-container">
+          <div className="header">
+            <div className="brand">
+              <div className="brand-icon"></div>
+              <div>
+                <div className="brand-title">ScholarSynth AI</div>
+                <div className="brand-subtitle">AI-Powered Research Assistant</div>
+              </div>
+            </div>
+          </div>
+          <div className="main-layout">
+            <Navigation 
+              currentView={currentView} 
+              onViewChange={setCurrentView}
+              currentUser={currentUser}
+            />
+            <div className="main-content">
+              {renderCurrentView()}
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Main Layout with Sidebar */}
-      <div className="main-layout">
-        {/* Sidebar Navigation */}
-        <Navigation 
-          currentView={currentView} 
-          onViewChange={setCurrentView}
-          currentUser={currentUser}
-        />
-
-        {/* Main Content */}
-        <div className="main-content">
-          {renderCurrentView()}
-        </div>
-      </div>
-    </div>
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }
 
