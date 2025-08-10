@@ -99,7 +99,7 @@ function App() {
       case 'visualizations':
         return <Visualizations />;
       case 'user':
-        return <User onLogout={handleLogout} />;
+        return <User onLogout={handleLogout} onGoSettings={() => setCurrentView('settings')} />;
       default:
         return <Dashboard onNavigate={setCurrentView} />;
     }
