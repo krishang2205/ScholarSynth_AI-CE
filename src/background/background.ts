@@ -3,8 +3,14 @@ import { aiService } from '../services/ai';
 import { searchService } from '../services/search';
 import { Note, UserProfile } from '../types';
 
-// Initialize services
-aiService.initialize();
+// --- Boot diagnostics (helps detect chunk / load failures) ---
+// If you do not see this in the service worker console, the worker failed to load.
+console.log('[ScholarSynth BG] Service worker starting...');
+
+// Initialize services (guarded to avoid aborting worker on failure)
+aiService.initialize().catch(err => {
+  console.error('[ScholarSynth BG] aiService.initialize failed:', err);
+});
 
 // Local fallback functions when API is not available
 function localSummarization(text: string): string {

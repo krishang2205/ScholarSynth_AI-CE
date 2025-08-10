@@ -1,30 +1,22 @@
 // Utility for reliable Chrome runtime messaging
-export const sendRuntimeMessage = async (message: any, retries = 2): Promise<any> => {
+export const sendRuntimeMessage = async (message: any, retries = 3): Promise<any> => {
+  let delay = 80;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      // Check if runtime is available
-      if (!chrome.runtime?.id) {
-        throw new Error('Extension runtime not available');
-      }
-
+      if (!chrome.runtime?.id) throw new Error('Extension runtime not available');
       const response = await chrome.runtime.sendMessage(message);
-      
-      // Check if response indicates an error
-      if (response && response.error) {
-        throw new Error(response.error);
-      }
-      
+      if (response && response.error) throw new Error(response.error);
       return response;
     } catch (error: any) {
-      console.warn(`Message attempt ${attempt + 1} failed:`, error);
-      
-      // If it's the last attempt or a critical error, throw
-      if (attempt === retries || error.message?.includes('Extension context invalidated')) {
-        throw error;
+      const msg = error?.message || '';
+      console.warn(`[Messaging] Attempt ${attempt + 1} failed for type=${message?.type}:`, msg);
+      const terminal = attempt === retries || msg.includes('Extension context invalidated');
+      if (terminal) throw error;
+      // Backoff a bit longer for the common race where the service worker is cold starting
+      if (msg.includes('Could not establish connection') || msg.includes('Receiving end does not exist')) {
+        delay += 120; // extend backoff
       }
-      
-      // Wait a bit before retrying
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(r => setTimeout(r, delay));
     }
   }
 };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ThemeToggle from './common/ThemeToggle';
 import { UserProfile } from '../../types';
 import { API_CONFIG } from '../../config/api-config';
 import { safeSendMessage } from '../../utils/message-utils';
@@ -32,21 +33,21 @@ const Settings: React.FC<SettingsProps> = () => {
     try {
       setLoading(true);
       const [settingsResponse, profileResponse] = await Promise.all([
-        safeSendMessage({ type: 'GET_SETTINGS' }),
-        safeSendMessage({ type: 'GET_USER_PROFILE' })
+        safeSendMessage({ type: 'GET_SETTINGS' }), // => { settings }
+        safeSendMessage({ type: 'GET_USER_PROFILE' }) // => { profile }
       ]);
 
-      if (settingsResponse.success && settingsResponse.data.settings) {
-        setSettings(settingsResponse.data.settings);
-        setApiKey(settingsResponse.data.settings.geminiApiKey || '');
-        if (typeof settingsResponse.data.settings.darkMode === 'boolean') {
-          setDarkMode(settingsResponse.data.settings.darkMode);
-          updateDocumentTheme(settingsResponse.data.settings.darkMode);
+      if (settingsResponse?.settings) {
+        setSettings(settingsResponse.settings);
+        setApiKey(settingsResponse.settings.geminiApiKey || '');
+        if (typeof settingsResponse.settings.darkMode === 'boolean') {
+          setDarkMode(settingsResponse.settings.darkMode);
+          updateDocumentTheme(settingsResponse.settings.darkMode);
         }
       }
 
-      if (profileResponse.success && profileResponse.data.profile) {
-        const profile = profileResponse.data.profile;
+      if (profileResponse?.profile) {
+        const profile = profileResponse.profile;
         setUserProfile(profile);
         setProfileForm({
           topics: profile.topics?.join(', ') || '',
@@ -72,16 +73,12 @@ const Settings: React.FC<SettingsProps> = () => {
   const handleSaveApiKey = async () => {
     try {
       setSaving(true);
-      const response = await safeSendMessage({
-        type: 'SET_API_KEY',
-        data: { apiKey: apiKey.trim() }
-      });
-
-      if (response.success) {
+      const response = await safeSendMessage({ type: 'SET_API_KEY', data: { apiKey: apiKey.trim() } });
+      if (response?.success) {
         showMessage('success', 'API key saved successfully');
         setSettings((prev: any) => ({ ...prev, geminiApiKey: apiKey.trim() }));
       } else {
-        showMessage('error', response.data?.error || 'Failed to save API key');
+        showMessage('error', response?.error || 'Failed to save API key');
       }
     } catch (error) {
       console.error('Error saving API key:', error);
@@ -127,20 +124,17 @@ const Settings: React.FC<SettingsProps> = () => {
 
       console.log('Profile to save:', updatedProfile);
 
-      const response = await safeSendMessage({
-        type: 'SAVE_USER_PROFILE',
-        data: { profile: updatedProfile }
-      });
+  const response = await safeSendMessage({ type: 'SAVE_USER_PROFILE', data: { profile: updatedProfile } });
 
       console.log('Save profile response:', response);
 
-      if (response.success) {
+      if (response?.success) {
         setUserProfile(updatedProfile);
         console.log('Profile saved successfully, showing success message');
         showMessage('success', 'Profile saved successfully');
       } else {
-        console.log('Profile save failed:', response.data?.error);
-        showMessage('error', response.data?.error || 'Failed to save profile');
+        console.log('Profile save failed:', response?.error);
+        showMessage('error', response?.error || 'Failed to save profile');
       }
     } catch (error) {
       console.error('Error saving profile:', error);
@@ -154,11 +148,10 @@ const Settings: React.FC<SettingsProps> = () => {
     try {
       setSaving(true);
       const response = await safeSendMessage({ type: 'TEST_API_KEY' });
-
-      if (response.success) {
+      if (response?.success) {
         showMessage('success', 'API key is working correctly!');
       } else {
-        showMessage('error', response.data?.error || 'API key test failed');
+        showMessage('error', response?.error || 'API key test failed');
       }
     } catch (error) {
       console.error('Error testing API key:', error);
@@ -205,10 +198,10 @@ const Settings: React.FC<SettingsProps> = () => {
               }}>
                 Appearance
               </h3>
-              <label style={{ fontSize:'var(--font-size-sm)', display:'flex', alignItems:'center', gap:6, cursor:'pointer' }}>
-                <input type="checkbox" checked={darkMode} onChange={handleToggleDarkMode} style={{ cursor:'pointer' }} />
-                <span>{darkMode? 'Dark Mode':'Light Mode'}</span>
-              </label>
+              <div style={{ display:'flex', alignItems:'center', gap:'0.75rem' }}>
+                <ThemeToggle checked={darkMode} onChange={() => handleToggleDarkMode()} />
+                <span style={{ fontSize:'var(--font-size-sm)', fontWeight:500 }}>{darkMode ? 'Dark Mode' : 'Light Mode'}</span>
+              </div>
             </div>
             <h3 style={{ 
               fontSize: 'var(--font-size-lg)', 

@@ -440,6 +440,27 @@ html, body {
 @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity:1; transform: translateY(0);} }
 .dark .toast { background: var(--background-tertiary); color: var(--text-primary); }
 
+/* Theme toggle switch */
+.theme-toggle { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
+.theme-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.toggle-track { width: 60px; height: 28px; background: #eceff1; border-radius: 999px; position: relative; display: inline-flex; align-items: center; justify-content: space-between; padding: 0 8px; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08); transition: background .35s; }
+.theme-toggle-on .toggle-track { background: #0f172a; }
+.toggle-thumb { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; background: #fff; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,.2); transition: transform .35s cubic-bezier(.65,.05,.36,1); }
+.theme-toggle-on .toggle-thumb { transform: translateX(32px); background: #fff; }
+.toggle-icon { color: #0f172a; opacity: .9; display: flex; align-items: center; justify-content: center; transition: opacity .35s, transform .35s; }
+.theme-toggle-on .toggle-icon-sun { opacity: 0; transform: translateY(4px) scale(.6); }
+.theme-toggle-on .toggle-icon-moon { color: #f1f5f9; }
+.toggle-icon-moon { opacity: 0; transform: translateY(-4px) scale(.6); color: #f1f5f9; }
+.theme-toggle-on .toggle-icon-moon { opacity: 1; transform: translateY(0) scale(1); }
+.theme-toggle:not(.theme-toggle-on) .toggle-icon-sun { opacity: 1; transform: translateY(0) scale(1); }
+.theme-toggle:not(.theme-toggle-on) .toggle-icon-moon { opacity: 0; }
+.theme-toggle:focus-within .toggle-track { box-shadow: 0 0 0 3px rgba(25,118,210,0.35); }
+.dark .toggle-track { background: #1e293b; }
+.dark .theme-toggle-on .toggle-track { background: #e2e8f0; }
+.dark .theme-toggle-on .toggle-icon-sun { color: #0f172a; opacity:1; transform: translateY(0) scale(1); }
+.dark .theme-toggle-on .toggle-icon-moon { opacity:0; }
+.dark .theme-toggle-on .toggle-thumb { background:#0f172a; }
+
 .user-name {
   font-size: 0.4rem;
   font-weight: 600;

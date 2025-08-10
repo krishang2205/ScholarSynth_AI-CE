@@ -64,14 +64,16 @@ module.exports = (env, argv) => {
       ]
     })
   ],
+  // IMPORTANT: Disable code splitting so the background service worker remains a single file.
+  // Multiple chunk files can fail to load in MV3 service workers and cause
+  // "Could not establish connection. Receiving end does not exist." when
+  // the onMessage listener never registers due to a chunk load error.
   optimization: {
-    splitChunks: {
-      chunks: 'all'
-    },
+    splitChunks: false,
+    runtimeChunk: false,
     minimize: true,
     minimizer: [
-      // Ensure no eval code in production
-      '...' // Use default minimizers
+      '...'
     ]
   },
   // Disable Node.js polyfills that might use eval
