@@ -84,6 +84,34 @@ const User: React.FC<UserProps> = ({ onLogout, onGoSettings }) => {
     { label: 'Member Since', value: userProfile.joinDate, icon: '📅' }
   ];
 
+  const handleExportData = async () => {
+    try {
+      const notes = await storageService.getAllNotes();
+      const data = {
+        exportedAt: new Date().toISOString(),
+        profile: userProfile,
+        notes
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'scholarsynth-export.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Export failed', e);
+    }
+  };
+
+  const handleContactSupport = () => {
+    const subject = encodeURIComponent('ScholarSynth AI Support Request');
+    const body = encodeURIComponent(`Hello Support,%0D%0A%0D%0AI need help with...%0D%0A%0D%0AUser: ${userProfile.name} (${userProfile.email})`);
+    window.open(`mailto:support@scholarsynth.ai?subject=${subject}&body=${body}`);
+  };
+
   return (
     <div className="user-profile">
       <div className="user-header">
@@ -180,7 +208,7 @@ const User: React.FC<UserProps> = ({ onLogout, onGoSettings }) => {
       <div className="user-preferences">
         <h3 className="preferences-title">Quick Actions</h3>
         <div className="action-buttons">
-          <button className="action-btn">
+          <button className="action-btn" onClick={handleExportData}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
             </svg>
@@ -192,7 +220,7 @@ const User: React.FC<UserProps> = ({ onLogout, onGoSettings }) => {
             </svg>
             Preferences
           </button>
-          <button className="action-btn">
+          <button className="action-btn" onClick={handleContactSupport}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
             </svg>
