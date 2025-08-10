@@ -29,7 +29,7 @@ import {
   OpenInNew as OpenInNewIcon,
   Star as StarIcon
 } from '@mui/icons-material';
-import { ExpandMore, ExpandLess } from '@mui/icons-material';
+import { ContentCopy, OpenInFull } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { Note } from '../../types';
 
@@ -46,8 +46,8 @@ const NotesList: React.FC = () => {
     tags: '',
     project: ''
   });
-  // Track which note summaries are expanded
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const [summaryDialogNote, setSummaryDialogNote] = useState<Note | null>(null);
 
   useEffect(() => {
     loadNotes();
@@ -213,31 +213,40 @@ const NotesList: React.FC = () => {
                       }
                       secondary={
                         <Box>
-                          <Box sx={{ position: 'relative', mb: 1, pr: 4 }}>
-                            <Typography 
-                              variant="body2" 
-                              color="text.secondary" 
+                          <Box sx={{ position: 'relative', mb: 1, pr: 8 }}>
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
                               sx={{ whiteSpace: 'pre-wrap' }}
                             >
-                              {expanded[note.id]
-                                ? note.summary
-                                : (note.summary.length > 150 ? `${note.summary.substring(0, 150)}...` : note.summary)
-                              }
+                              {note.summary.length > 150 ? `${note.summary.substring(0,150)}...` : note.summary}
                             </Typography>
                             {note.summary.length > 150 && (
-                              <IconButton
-                                size="small"
-                                aria-label={expanded[note.id] ? 'Collapse summary' : 'Expand summary'}
-                                onClick={() => setExpanded(prev => ({ ...prev, [note.id]: !prev[note.id] }))}
-                                sx={{
-                                  position: 'absolute',
-                                  top: 0,
-                                  right: 0,
-                                  transform: 'translateY(-4px)'
-                                }}
-                              >
-                                {expanded[note.id] ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-                              </IconButton>
+                              <Box sx={{ position: 'absolute', top: 0, right: 0, display: 'flex', gap: 0.5 }}>
+                                <IconButton
+                                  size="small"
+                                  aria-label="Open full summary dialog"
+                                  onClick={() => setSummaryDialogNote(note)}
+                                >
+                                  <OpenInFull fontSize="inherit" />
+                                </IconButton>
+                                <IconButton
+                                  size="small"
+                                  aria-label="Copy full summary"
+                                  onClick={async () => {
+                                    try {
+                                      await navigator.clipboard.writeText(note.summary);
+                                      setCopyFeedback(note.id);
+                                      setTimeout(() => setCopyFeedback(null), 1500);
+                                    } catch {}
+                                  }}
+                                >
+                                  <ContentCopy fontSize="inherit" />
+                                </IconButton>
+                              </Box>
+                            )}
+                            {copyFeedback === note.id && (
+                              <Typography variant="caption" sx={{ position: 'absolute', bottom: -6, right: 8, color: 'success.main' }}>Copied</Typography>
                             )}
                           </Box>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -349,6 +358,38 @@ const NotesList: React.FC = () => {
         <DialogActions>
           <Button onClick={() => setEditDialogOpen(false)}>Cancel</Button>
           <Button onClick={handleSaveEdit} variant="contained">Save</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Full Summary Dialog */}
+      <Dialog
+        open={!!summaryDialogNote}
+        onClose={() => setSummaryDialogNote(null)}
+        maxWidth="md"
+        fullWidth
+        aria-labelledby="full-summary-title"
+      >
+        <DialogTitle id="full-summary-title">Full Summary</DialogTitle>
+        <DialogContent dividers sx={{ maxHeight: 400 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+            {summaryDialogNote?.title}
+          </Typography>
+          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+            {summaryDialogNote?.summary}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={async () => {
+              if (summaryDialogNote) {
+                try { await navigator.clipboard.writeText(summaryDialogNote.summary); } catch {}
+              }
+            }}
+            startIcon={<ContentCopy fontSize="small" />}
+          >
+            Copy
+          </Button>
+          <Button onClick={() => setSummaryDialogNote(null)} variant="contained">Close</Button>
         </DialogActions>
       </Dialog>
     </Box>
