@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
 interface NavigationProps {
-  currentView: 'dashboard' | 'notes' | 'search' | 'chat' | 'settings' | 'visualizations' | 'user';
-  onViewChange: (view: 'dashboard' | 'notes' | 'search' | 'chat' | 'settings' | 'visualizations' | 'user') => void;
+  currentView: 'dashboard' | 'notes' | 'search' | 'chat' | 'settings' | 'visualizations' | 'user' | 'hiresmart';
+  onViewChange: (view: 'dashboard' | 'notes' | 'search' | 'chat' | 'settings' | 'visualizations' | 'user' | 'hiresmart') => void;
   currentUser?: { id: string; email: string; name: string; profileData?: any } | null;
 }
 
@@ -63,6 +63,15 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange, curr
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
           <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+        </svg>
+      )
+    },
+    { 
+      id: 'hiresmart', 
+      label: 'HireSmart', 
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 3.5C14.8 3.3 14.4 3.1 14 3.1S13.2 3.3 13 3.5L7 7V9H21ZM16 10V15H8V10H2V21H22V10H16Z"/>
         </svg>
       )
     },

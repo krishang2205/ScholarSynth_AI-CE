@@ -1577,3 +1577,248 @@ html, body {
 .alert-error::before {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23ef4444'%3E%3Cpath fill-rule='evenodd' d='M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z' clip-rule='evenodd' /%3E%3C/svg%3E");
 }
+
+/* HireSmart AI Landing Page Styles */
+.hiresmart-landing {
+  padding: 0;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: linear-gradient(135deg, var(--primary-50) 0%, var(--accent-50) 100%);
+}
+
+/* Hero Section */
+.hero-section {
+  padding: var(--spacing-6) var(--spacing-4);
+  text-align: center;
+  background: linear-gradient(135deg, var(--primary-800) 0%, var(--primary-900) 100%);
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-icon {
+  color: var(--accent-400);
+  margin-bottom: var(--spacing-3);
+  display: flex;
+  justify-content: center;
+}
+
+.hero-title {
+  font-size: var(--font-size-3xl);
+  font-weight: 700;
+  color: white;
+  margin-bottom: var(--spacing-3);
+  letter-spacing: -0.025em;
+}
+
+.hero-subtitle {
+  font-size: var(--font-size-sm);
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.6;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+/* Features Section */
+.features-section {
+  padding: var(--spacing-6) var(--spacing-4);
+}
+
+.section-title {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--gray-900);
+  text-align: center;
+  margin-bottom: var(--spacing-5);
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-4);
+}
+
+.feature-card {
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-4);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--accent-300);
+}
+
+.feature-icon {
+  color: var(--accent-600);
+  margin-bottom: var(--spacing-3);
+  display: flex;
+  justify-content: flex-start;
+}
+
+.feature-card h3 {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: var(--spacing-2);
+}
+
+.feature-card p {
+  font-size: var(--font-size-sm);
+  color: var(--gray-600);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Integration Section */
+.integration-section {
+  padding: var(--spacing-6) var(--spacing-4);
+  background: white;
+  border-top: 1px solid var(--gray-200);
+}
+
+.integration-content {
+  text-align: center;
+}
+
+.integration-text p {
+  font-size: var(--font-size-base);
+  color: var(--gray-700);
+  line-height: 1.6;
+  margin-bottom: var(--spacing-4);
+}
+
+.integration-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+.integration-features li {
+  font-size: var(--font-size-sm);
+  color: var(--gray-600);
+  margin-bottom: var(--spacing-2);
+  padding-left: var(--spacing-1);
+}
+
+/* CTA Section */
+.cta-section {
+  padding: var(--spacing-6) var(--spacing-4);
+  background: linear-gradient(135deg, var(--primary-800) 0%, var(--accent-700) 100%);
+  color: white;
+  text-align: center;
+}
+
+.cta-content h2 {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  margin-bottom: var(--spacing-3);
+}
+
+.cta-content p {
+  font-size: var(--font-size-base);
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.6;
+  margin-bottom: var(--spacing-4);
+  max-width: 300px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.cta-buttons {
+  display: flex;
+  gap: var(--spacing-3);
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.cta-primary, .cta-secondary {
+  padding: var(--spacing-3) var(--spacing-4);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  min-width: 120px;
+}
+
+.cta-primary {
+  background: var(--accent-500);
+  color: white;
+}
+
+.cta-primary:hover {
+  background: var(--accent-600);
+  transform: translateY(-1px);
+}
+
+.cta-secondary {
+  background: transparent;
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.cta-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Dark mode styles for HireSmart landing */
+.dark .hiresmart-landing {
+  background: linear-gradient(135deg, var(--background-secondary) 0%, var(--background-tertiary) 100%);
+}
+
+.dark .feature-card {
+  background: var(--background-primary);
+  border-color: var(--border-color);
+}
+
+.dark .feature-card h3 {
+  color: var(--text-primary);
+}
+
+.dark .feature-card p {
+  color: var(--text-secondary);
+}
+
+.dark .integration-section {
+  background: var(--background-secondary);
+  border-color: var(--border-color);
+}
+
+.dark .integration-text p {
+  color: var(--text-primary);
+}
+
+.dark .integration-features li {
+  color: var(--text-secondary);
+}
+
+.dark .section-title {
+  color: var(--text-primary);
+}

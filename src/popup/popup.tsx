@@ -9,12 +9,13 @@ import Settings from './components/Settings';
 import Visualizations from './components/Visualizations';
 import User from './components/User';
 import Auth from './components/Auth';
+import HireSmartLanding from './components/HireSmartLanding';
 import { authService } from '../services/auth';
 import { safeSendMessage } from '../utils/message-utils';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ToastProvider } from './components/common/ToastProvider';
 
-type ViewType = 'dashboard' | 'notes' | 'search' | 'chat' | 'settings' | 'visualizations' | 'user';
+type ViewType = 'dashboard' | 'notes' | 'search' | 'chat' | 'settings' | 'visualizations' | 'user' | 'hiresmart';
 
 function App() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
@@ -102,6 +103,8 @@ function App() {
         return <Visualizations />;
       case 'user':
         return <User onLogout={handleLogout} onGoSettings={() => setCurrentView('settings')} />;
+      case 'hiresmart':
+        return <HireSmartLanding />;
       default:
         return <Dashboard onNavigate={setCurrentView} />;
     }
